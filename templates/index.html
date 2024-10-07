@@ -1,0 +1,6 @@
+{% extends "layout.html" %} {% block title %} FuteINF {% endblock %} {% block
+content %}
+<h1>Lista do Fute</h1>
+
+<div hx-get="/jogadores" hx-trigger="load,every 10s" hx-swap="innerHTML"></div>
+{% endblock %}
