@@ -1,9 +1,14 @@
-use actix_web::{get, middleware::Logger, web, App, HttpResponse, HttpServer, Responder, ResponseError};
+use actix_web::{
+    cookie::time::error, get, middleware::Logger, web::{self, Data}, App, HttpResponse, HttpServer, Responder, ResponseError
+};
+use dotenv::dotenv;
 use env_logger::Env;
-use lazy_static::lazy_static;
-use tera::Tera;
+use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 
+mod db;
 mod list;
+mod services;
+mod templates;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -13,6 +18,8 @@ pub enum Error {
     TemplateError(#[from] tera::Error),
     #[error("an unexpected error occurred: {0}")]
     UnexpectedError(#[from] anyhow::Error),
+    #[error("database error: {0}")]
+    DatabaseError(#[from] sqlx::Error)
 }
 
 impl ResponseError for Error {
@@ -27,42 +34,33 @@ impl ResponseError for Error {
     }
 }
 
-lazy_static! {
-    static ref TEMPLATES: Tera = {
-        let source = "templates/**/*.html";
-        let mut tera = Tera::new(source).expect("failed to compile template");
-        tera.autoescape_on(vec![".html", ".sql"]);
-        tera
-    };
-}
-
-#[get("/")]
-async fn index() -> Result<impl Responder> {
-    let context = tera::Context::new();
-    let page_content = TEMPLATES.render("index.html", &context)?;
-    Ok(HttpResponse::Ok().body(page_content))
-}
-
-#[get("/jogadores")]
-async fn jogadores() -> Result<impl Responder> {
-    let mut context = tera::Context::new();
-    context.insert("jogadores", &list::get_list());
-    context.insert("max_jogadores", &list::get_max_jogadores());
-    let page_content = TEMPLATES.render("shards/jogadores.html", &context)?;
-    Ok(HttpResponse::Ok().body(page_content))
+pub struct AppState {
+    db: Pool<Postgres>,
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    dotenv().ok();
+
     env_logger::init_from_env(Env::default().default_filter_or("info"));
-    HttpServer::new(|| {
-        App::new()
-        .wrap(Logger::default())
-        .wrap(Logger::new("%a %{User-Agent}i"))
-        .service(index)
-        .service(jogadores)
-    })
-        .bind(("0.0.0.0", 8080))?
-        .run()
+
+    // Database
+
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url)
         .await
+        .expect("Error building a connection pool");
+    HttpServer::new(move || {
+        App::new()
+            .app_data(Data::new(AppState { db: pool.clone() }))
+            .wrap(Logger::default())
+            .wrap(Logger::new("%a %{User-Agent}i"))
+            .service(services::index)
+            .service(services::jogadores)
+    })
+    .bind(("0.0.0.0", 8080))?
+    .run()
+    .await
 }

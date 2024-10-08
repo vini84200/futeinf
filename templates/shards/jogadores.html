@@ -1,6 +1,5 @@
-
 <div>
-    <span class="badge 
+  <span class="badge 
     {%if jogadores|length == max_jogadores%}
     text-bg-danger
     {%else%}
@@ -8,9 +7,11 @@
     {%endif%}
     
     ">{{jogadores|length}} / {{max_jogadores}}</span>
-<ul>
+  <ul class="list-group">
 
     {% for jogador in jogadores %}
-    <li> {{jogador.nome}} </li>
+    <li class="list-group-item"> {{jogador.nome}} </li>
     {% endfor %}
-</ul></div>
+  </ul>
+
+</div>
