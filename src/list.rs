@@ -4,8 +4,9 @@ use crate::Result;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Jogador {
-    nome: String,
-    apelido: String,
+    pub nome: String,
+    pub id: i32,
+    pub apelido: String,
 }
 
 #[derive(Deserialize, Debug)]
@@ -53,6 +54,7 @@ pub async fn get_list(db: Pool<Postgres>) -> Result<Vec<Jogador>> {
             Jogador {
                 nome: camisa.clone(),
                 apelido: camisa,
+                id: fv.ticket_id_fk.unwrap()
             }
         })
     .collect()

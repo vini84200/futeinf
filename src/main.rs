@@ -59,6 +59,8 @@ async fn main() -> std::io::Result<()> {
             .wrap(Logger::new("%a %{User-Agent}i"))
             .service(services::index)
             .service(services::jogadores)
+            .service(services::vote)
+            .service(services::vote_submit)
     })
     .bind(("0.0.0.0", 8080))?
     .run()
