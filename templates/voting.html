@@ -2,53 +2,115 @@
 <div class="row">
   <h1>Votando </h1>
 
+  <style>
+    @keyframes pulse {
+        0% {
+            opacity: 100%;
+        }
+        50% {
+            opacity: 50%;
+        }
+        100% {
+            opacity: 100%;
+        }
+
+    }
+    .araste-aqui {
+      animation: pulse 1.4s infinite;
+    }
+  </style>
+
+  <p>
+    Arraste os jogadores para a área de votação e os ordene de acordo com sua preferência.
+    O jogador mais ao topo é o melhor jogador, e o jogador mais ao final é o pior jogador.
+    Jogadores que não forem votados serão considerados como piores jogadores.
+  </p>
+
   <div id="voting">
 
-    <div class="sortable-save" style="border: 1px black solid;" >
-      
-    </div>
-    <div class="sortable-discard" style="border: 1px red solid;">
-      {% for player in players %}
-        <div class="player-sort" data-id="{{ player.id }}">
-          <p>{{ player.nome }}</p>
+    <div class="alert bg-primary py-4 ">
+    <h2
+        class="text-white bold"
+    >Votação</h2>
+      <span class="badge badge-pill badge-primary">Melhor</span>
+      <div class="sortable-save" >
+        <div class="filtered alert border border-info araste-aqui" id="save-placeholder" data-id="save-placeholder">
+          Arraste os jogadores para cá
         </div>
-      {% endfor %}
+
+
+      </div>
+      <span class="badge badge-pill badge-warn">Pior</span>
     </div>
-      <button 
+    <div class="alert bg-secondary">
+      <h2>Descarte</h2>
+      <p>
+        Jogadores que não forem votados serão considerados como piores jogadores.
+      </p>
+      <div class="sortable-discard" >
+        {% for player in players %}
+        <div class="player-sort card m-1" data-id="{{ player.id }}">
+          <div class="card-body">
+            {{ player.nome }}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+    </div>
+
+      <button
       id="save"
+        class="btn btn-primary"
       >Salvar</button>
   </div>
 
   <script>
     $(document).ready(function () {
-      var discard = new Sortable(document.querySelector('.sortable-discard'), {
-        group: 'shared',
-        animation: 150,
-        onEnd: function (evt) {
-        },
-        filter: '.filtered'
-      });
       var save = new Sortable(document.querySelector('.sortable-save'), {
         group: 'shared',
         animation: 150,
         onEnd: function (evt) {
+            // Check if the list is empty
+            if (save.toArray().length === 0) {
+                $('#save-placeholder').show()
+            } else {
+                $('#save-placeholder').hide()
+            }
+
+        },
+        filter: '.filtered',
+      });
+      var discard = new Sortable(document.querySelector('.sortable-discard'), {
+        group: 'shared',
+        animation: 150,
+        onEnd: function (evt) {
+          if (save.toArray().length === 0) {
+            $('#save-placeholder').show()
+          } else {
+            $('#save-placeholder').hide()
+          }
         },
         filter: '.filtered'
       });
 
-      $('#save').click(function () {
+      $('#save').click(function() {
         const players = save.toArray()
-        $.ajax({
-          url: '/voting/{{ballot_id}}/',
-          type: 'POST',
-          data: JSON.stringify({
-            players: players
-          }),
-          contentType: "application/json; charset=utf-8",
-          success: function (data) {
-            console.log(data);
-          }
-        });
+
+        axios.post('/voting/{{ballot_id}}/', {
+            players: players.filter((player) => player !== 'save-placeholder')
+          })
+            .then(function (response) {
+                window.location.href = '/voting/{{ballot_id}}/success'
+            })
+            .catch(function (error) {
+                console.log(error);
+                alert('Erro ao salvar votos:' + error)
+            });
+
+
+
+
       });
 
     });

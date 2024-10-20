@@ -1,6 +1,6 @@
+use crate::error::Result;
 use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Postgres};
-use crate::Result;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Jogador {
@@ -22,7 +22,7 @@ pub struct Ticket {
 pub struct TicketFieldValue {
     ticket_id_fk: Option<i32>,
     field_value: Option<String>,
-    field_configuration_id_fk: Option<i64>
+    field_configuration_id_fk: Option<i64>,
 }
 
 
@@ -54,12 +54,11 @@ pub async fn get_list(db: Pool<Postgres>) -> Result<Vec<Jogador>> {
             Jogador {
                 nome: camisa.clone(),
                 apelido: camisa,
-                id: fv.ticket_id_fk.unwrap()
+                id: fv.ticket_id_fk.unwrap(),
             }
         })
-    .collect()
+        .collect()
     )
-
 }
 
 pub fn get_max_jogadores() -> usize {

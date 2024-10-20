@@ -1,0 +1,15 @@
+{% extends "layout.html" %} {% block title %} FuteINF {% endblock %}
+
+{% block content %}
+
+    <div class="alert alert-danger d-flex align-items-center" role="alert">
+        <div class="flex-shrink-0 me-2" role="img" aria-label="Danger:">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+        </div>
+        <div>
+            {{ error }}
+        </div>
+    </div>
+
+{% endblock %}
+

@@ -23,5 +23,15 @@
   >
   <div hx-get="/jogadores" hx-trigger="load,every 10s" hx-swap="innerHTML"></div>
 </div>
+
+<button
+  hx-post="/voting/create/1"
+  hx-trigger="click"
+  hx-swap="innerHTML"
+  hx-target="body"
+  class="btn btn-primary"
+  >
+  Votar
+</button>
 {% endblock %}
 
