@@ -1,5 +1,6 @@
 use crate::templates::TEMPLATES;
 use crate::{entities, list, AppState, error::Result};
+use actix_identity::Identity;
 use actix_web::web::Data;
 use actix_web::{get, post, web, HttpResponse, Responder};
 use anyhow::anyhow;
@@ -19,7 +20,12 @@ pub async fn voting(state: Data<AppState>) -> crate::error::Result<impl Responde
 }
 
 #[post("/voting/create/{event_id}")]
-pub async fn voting_create(state: Data<AppState>, path: web::Path<u32>) -> crate::error::Result<impl Responder> {
+pub async fn voting_create(
+    state: Data<AppState>, path: web::Path<u32>,
+    identity: Option<Identity>
+) -> crate::error::Result<impl Responder> {
+
+    let identity = identity.ok_or(anyhow!("Not logged in"))?;
 
     let event_id = path.into_inner();
 
@@ -38,7 +44,7 @@ pub async fn voting_create(state: Data<AppState>, path: web::Path<u32>) -> crate
         players: ActiveValue::Set(players_json),
         vote: ActiveValue::Set(serde_json::json!([])),
         date: ActiveValue::Set(chrono::Utc::now()),
-        voter: ActiveValue::Set("".to_string()),
+        voter: ActiveValue::Set(identity.id().unwrap().to_string()),
         fute_id: ActiveValue::Set(event_id as i32),
         state: ActiveValue::Set("open".to_string()), // TODO: Change to enum.
         ..Default::default()
@@ -52,7 +58,10 @@ pub async fn voting_create(state: Data<AppState>, path: web::Path<u32>) -> crate
 }
 
 #[get("/voting/{ballot_id}")]
-pub async fn vote(state: Data<AppState>, path: web::Path<u32>) -> crate::error::Result<impl Responder> {
+pub async fn vote(state: Data<AppState>, path: web::Path<u32>,
+    identity: Option<Identity>
+) -> crate::error::Result<impl Responder> {
+    let identity = identity.ok_or(anyhow!("Not logged in"))?;
     let ballot_id = path.into_inner();
     // Get players and add them to the context
     let mut players: Vec<list::Jogador> = vec![];
@@ -60,6 +69,9 @@ pub async fn vote(state: Data<AppState>, path: web::Path<u32>) -> crate::error::
     let db = &state.db;
     let ballot: Option<ballot::Model> = Ballot::find_by_id(ballot_id as i32).one(db).await?;
     if let Some(ballot) = ballot {
+        if ballot.voter != identity.id().unwrap() {
+            return Ok(HttpResponse::Unauthorized().body("You are not allowed to vote on this ballot"));
+        }
         let mut context = tera::Context::new();
         context.insert("ballot_id", &ballot_id);
         let players_ids: Vec<i32> = serde_json::from_value(ballot.players)?;
@@ -92,11 +104,16 @@ pub async fn vote_submit(
     state: Data<AppState>,
     path: web::Path<u32>,
     cast_vote: web::Json<CastVote>,
+    identity: Option<Identity>,
 ) -> crate::error::Result<impl Responder> {
     let ballot_id = path.into_inner();
+    let identity = identity.ok_or(anyhow!("Not logged in"))?;
 
     let db = &state.db;
     let ballot: ballot::Model = Ballot::find_by_id(ballot_id as i32).one(db).await?.ok_or(anyhow!("Ballot not found"))?;
+    if ballot.voter != identity.id().unwrap() {
+        return Ok(HttpResponse::Unauthorized().body("You are not allowed to vote on this ballot"));
+    }
     if ballot.state != "open" {
         return Ok(HttpResponse::BadRequest().body("Ballot is not open"));
     }
@@ -127,11 +144,17 @@ pub async fn vote_submit(
 }
 
 #[get("/voting/{ballot_id}/success")]
-pub async fn vote_success(state: Data<AppState>, path: web::Path<u32>) -> Result<impl Responder> {
+pub async fn vote_success(state: Data<AppState>, path: web::Path<u32>,
+    identity: Option<Identity>
+) -> Result<impl Responder> {
+    let identity = identity.ok_or(anyhow!("Not logged in"))?;
     let ballot_id = path.into_inner();
     let db = &state.db;
     let ballot: Option<ballot::Model> = Ballot::find_by_id(ballot_id as i32).one(db).await?;
     if let Some(ballot) = ballot {
+        if ballot.voter != identity.id().unwrap() {
+            return Ok(HttpResponse::Unauthorized().body("You are not allowed to vote on this ballot"));
+        }
         let mut context = tera::Context::new();
         context.insert("ballot_id", &ballot_id);
         let votes: Vec<i32> = serde_json::from_value(ballot.vote)?;

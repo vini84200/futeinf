@@ -5,6 +5,33 @@
 <h1>Lista do Fute</h1>
 </div>
 
+{% if logged_in %}
+<span>
+  Hello {{ username }}!
+  <button
+    class="btn btn-primary"
+    hx-post="/logout"
+    >
+    <i class="bi bi-plus"></i>
+    Logout
+  </button>
+</span>
+{% else %}
+<div 
+  class="row"
+  >
+  <div class="col-5">
+<a
+  href="/login"
+  class="btn btn-primary"
+  >
+  <i class="bi bi-plus"></i>
+  Login
+</a>
+  </div>
+  {% endif %}
+
+
 <div 
   class="row"
   >

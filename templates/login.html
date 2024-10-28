@@ -1,0 +1,52 @@
+{% extends "layout.html" %} {% block title %} FuteINF {% endblock %}
+
+{% block content %}
+
+<form
+    hx-post="/login"
+    hx-trigger="submit"
+    hx-swap="outerHTML"
+    hx-target="#login-error"
+    hx-target-400="#login-error"
+>
+    <div
+        class="form-group"
+    >
+        <label
+            for="email"
+        >
+            Email
+        </label>
+        <input
+            type="email"
+            class="form-control"
+            id="email"
+            name="email"
+        >
+    </div>
+    <div>
+        <label
+            for="password"
+        >
+            Senha
+        </label>
+        <input
+            type="password"
+            class="form-control"
+            id="password"
+            name="password"
+        >
+    </div>
+
+
+    <button
+        type="submit"
+        class="btn btn-primary"
+
+    >
+        Login
+    </button>
+</form>
+    <div id="login-error" ></div>
+{% endblock %}
+
