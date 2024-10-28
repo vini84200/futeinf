@@ -4,6 +4,7 @@ use actix_identity::Identity;
 use actix_web::web::Data;
 use actix_web::{get, post, web, HttpResponse, Responder};
 use anyhow::anyhow;
+use itertools::Itertools;
 use log::info;
 use rand::prelude::SliceRandom;
 use sea_orm::{ActiveModelTrait, ActiveValue, EntityTrait};
@@ -19,25 +20,46 @@ pub async fn voting(state: Data<AppState>) -> crate::error::Result<impl Responde
     Ok(HttpResponse::Ok().body(page_content))
 }
 
-#[post("/voting/create/{event_id}")]
+#[post("/voting/create")]
 pub async fn voting_create(
-    state: Data<AppState>, path: web::Path<u32>,
+    state: Data<AppState>, 
     identity: Option<Identity>
 ) -> crate::error::Result<impl Responder> {
 
     let identity = identity.ok_or(anyhow!("Not logged in"))?;
 
-    let event_id = path.into_inner();
-
     let db = &state.db;
 
     let all_players : Vec<jogador::Model> = Jogador::find().all(db).await?;
 
+
+    struct EmailNaLista {
+        email: Option<String>,
+    }
+    // Filter for players that have been active in the last 30 days
+    let players: Vec<_> = sqlx::query_as!(
+        EmailNaLista,
+        "select distinct email_address as email FROM ticket WHERE event_id IN (SELECT id FROM event WHERE start_ts > NOW() - INTERVAL '30 days') and email_address is not null;",
+    ).fetch_all(&state.alfio_db).await?;
+
+    let players = players.iter().map(|f| f.email.to_owned()).collect::<Option<Vec<_>>>().unwrap_or_default();
+    info!("Players: {:?}", players);
+    let elegible_players = all_players.iter().filter(|x| players.contains(&x.email)).collect::<Vec<_>>();
+
+    info!("Elegible players({}): {:?}", elegible_players.len(), elegible_players);
+
+    if elegible_players.len() < 5 {
+        return Ok(HttpResponse::BadRequest().body("Not enough players to create a ballot"));    
+    }
+
     // Get 5 random players
-    let players = all_players.choose_multiple(&mut rand::thread_rng(), 5)
+    let players = elegible_players.choose_multiple(&mut rand::thread_rng(), 5)
+        .cloned()
         .collect::<Vec<&jogador::Model>>();
 
     let players_json = serde_json::json!(players.iter().map(|x| x.id).collect::<Vec<i32>>());
+
+    let event_id = 1;
 
     // TODO: Check if the event exists and has voting enabled
     let ballot = ballot::ActiveModel {
@@ -53,7 +75,7 @@ pub async fn voting_create(
     let ballot = ballot.save(db).await?;
     Ok(HttpResponse::Ok()
         .append_header(("HX-Redirect", format!("/voting/{}", ballot.id.unwrap())))
-        .await
+        .body("Voting created")
     )
 }
 
