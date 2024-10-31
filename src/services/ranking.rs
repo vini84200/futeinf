@@ -1,12 +1,11 @@
 use std::collections::HashMap;
 use crate::error::Result;
+use crate::timings::{get_last_ref_point, get_ref_point_of, ref_point_id};
 use actix_web::{get, HttpResponse, Responder};
 use actix_web::web::Data;
-use anyhow::anyhow;
-use chrono::Duration;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-use chrono::prelude::*;
 use itertools::Itertools;
+use chrono::prelude::*;
 use log::{info, log};
 use serde::Serialize;
 use crate::AppState;
@@ -15,37 +14,17 @@ use crate::entities::ballot::Column::Vote;
 use crate::entities::prelude::{Ballot, Jogador};
 use crate::templates::TEMPLATES;
 
-pub const WEEK_IN_SECONDS: i64 = 604800;
 
-pub fn get_last_reset() -> DateTime<Utc> {
 
-    //reference reset date / time
 
-    let past_reset : DateTime<Utc> = Local.with_ymd_and_hms(2024, 1, 7, 19, 0, 0).unwrap().with_timezone(&Utc);
-
-    //current time
-    let now: DateTime<Utc> = Utc::now();
-
-    //get Duration since reference reset
-    let d = now - past_reset;
-
-    // divide by a week, and get the remainder
-    let rem = d.num_seconds() % WEEK_IN_SECONDS;
-
-    //subtract the remainder from current time
-    let target = now - Duration::seconds(rem);
-
-    //last reset / datetime
-    target
-}
 #[get("/debugRanking")]
 pub async fn debug_ranking(state: Data<AppState>) -> Result<impl Responder> {
     let db = &state.db;
 
+    let now = Utc::now();
+
     // Get the start of the week, ie. the last monday
-    let start_of_week = get_last_reset();
-
-
+    let start_of_week = get_ref_point_of(now);
 
     // COMPUTE RANKING
     // Get all votes this week
@@ -194,6 +173,7 @@ pub async fn debug_ranking(state: Data<AppState>) -> Result<impl Responder> {
     context.insert("last_reset", &start_of_week.with_timezone(&Local).format("%d/%m/%Y %H:%M:%S").to_string());
     context.insert("now", &Utc::now().with_timezone(&Local).format("%d/%m/%Y %H:%M:%S").to_string());
     context.insert("ranking", &players_mentioned);
+    context.insert("ref_point_id", &ref_point_id(now));
     let page_content = TEMPLATES.render("debug_ranking.html", &context)?;
     Ok(HttpResponse::Ok().body(page_content))
 }

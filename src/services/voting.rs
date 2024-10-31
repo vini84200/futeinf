@@ -1,15 +1,15 @@
 use crate::templates::TEMPLATES;
+use crate::timings::{can_cast_vote, can_create_ballot, get_end_elegible_check, get_ref_point_of, get_start_elegible_check, ref_point_from_id, ref_point_id};
 use crate::{entities, list, AppState, error::Result};
+use sqlx::{prelude::*, query, query_as};
 use actix_identity::Identity;
 use actix_web::web::Data;
 use actix_web::{get, post, web, HttpResponse, Responder};
 use anyhow::anyhow;
-use itertools::Itertools;
 use log::info;
 use rand::prelude::SliceRandom;
-use sea_orm::{ActiveModelTrait, ActiveValue, EntityTrait};
+use sea_orm::{ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Deserializer};
-use sqlx::types::chrono;
 use entities::{prelude::*, *};
 use crate::error::Error;
 
@@ -30,16 +30,46 @@ pub async fn voting_create(
 
     let db = &state.db;
 
+    let now = chrono::Utc::now();
+    let ref_point = get_ref_point_of(now);
+    let event_id = ref_point_id(now);
+
+    // Check if a open ballot exists for the current week
+    let alredy_open_ballot = Ballot::find()
+        .filter(ballot::Column::FuteId.eq(event_id as i32))
+        .filter(ballot::Column::State.eq("open"))
+        .filter(ballot::Column::Voter.eq(identity.id().unwrap()))
+        .one(db)
+        .await?
+    ;
+
+    if let Some(b) = alredy_open_ballot {
+        // Send the user to the voting page
+        return Ok(HttpResponse::Ok()
+            .append_header(("HX-Redirect", format!("/voting/{}", b.id)))
+            .body("Voting created")
+        )
+    }
+
+    // Check if we can create a ballot
+
+    let can_create_ballot = can_create_ballot(now);
+    if !can_create_ballot {
+        return Ok(HttpResponse::BadRequest().body("Cannot create a ballot at this time"));
+    }
+    let start_elegible_check = get_start_elegible_check(now);
+    let end_elegible_check = get_end_elegible_check(now);
+
     let all_players : Vec<jogador::Model> = Jogador::find().all(db).await?;
 
 
-    struct EmailNaLista {
-        email: Option<String>,
-    }
     // Filter for players that have been active in the last 30 days
-    let players: Vec<_> = sqlx::query_as!(
-        EmailNaLista,
-        "select distinct email_address as email FROM ticket WHERE event_id IN (SELECT id FROM event WHERE start_ts > NOW() - INTERVAL '30 days') and email_address is not null;",
+    let players: Vec<_> = query!(
+        "select distinct email_address as email FROM ticket WHERE event_id IN 
+        (SELECT id FROM event WHERE start_ts between $1 and $2)
+         and email_address is not null;",
+        start_elegible_check,
+        end_elegible_check
     ).fetch_all(&state.alfio_db).await?;
 
     let players = players.iter().map(|f| f.email.to_owned()).collect::<Option<Vec<_>>>().unwrap_or_default();
@@ -59,7 +89,6 @@ pub async fn voting_create(
 
     let players_json = serde_json::json!(players.iter().map(|x| x.id).collect::<Vec<i32>>());
 
-    let event_id = 1;
 
     // TODO: Check if the event exists and has voting enabled
     let ballot = ballot::ActiveModel {
@@ -131,6 +160,7 @@ pub async fn vote_submit(
     let ballot_id = path.into_inner();
     let identity = identity.ok_or(anyhow!("Not logged in"))?;
 
+
     let db = &state.db;
     let ballot: ballot::Model = Ballot::find_by_id(ballot_id as i32).one(db).await?.ok_or(anyhow!("Ballot not found"))?;
     if ballot.voter != identity.id().unwrap() {
@@ -139,6 +169,12 @@ pub async fn vote_submit(
     if ballot.state != "open" {
         return Ok(HttpResponse::BadRequest().body("Ballot is not open"));
     }
+    let now = chrono::Utc::now();
+    let ballot_rt = ref_point_from_id(ballot.fute_id as i32);
+    if !can_cast_vote(ballot_rt) {
+        return Ok(HttpResponse::BadRequest().body("Voting is closed"));
+    }
+
     info!("Ballot: {:?}", ballot);
     info!("Cast vote: {:?}", cast_vote);
     let cast_vote = cast_vote.players.iter()

@@ -1,7 +1,7 @@
 use std::{env, time::Duration};
 
 use actix_web::{
-    cookie::{time::serde::rfc2822::option::serialize, Key}, middleware::Logger, web::Data, App, HttpResponse, HttpServer, ResponseError
+    cookie::{Key}, middleware::Logger, web::Data, App, HttpResponse, HttpServer, ResponseError
 };
 use base64::{engine::general_purpose::STANDARD, Engine};
 use dotenv::dotenv;
@@ -22,6 +22,7 @@ mod services;
 mod templates;
 mod entities;
 mod error;
+mod timings;
 
 
 pub struct AppState {
