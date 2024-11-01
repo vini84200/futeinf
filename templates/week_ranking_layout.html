@@ -1,0 +1,28 @@
+{% extends "layout.html" %} {% block title %} FuteINF {% endblock %}
+
+{% block content %}
+
+<div>
+    <h1>Ranking da Semana {{semana}}</h1>
+    <p>Veja a classificação dos times:</p>
+
+    <div class="btn-group" role="group" aria-label="Basic example">
+        <a href="/week_ranking/{{week_id - 1}}" class="btn btn-primary">
+            <i class="bi bi-caret-left"></i>     
+            Semana Anterior
+        </a>
+        <a href="/week_ranking/{{week_id + 1}}" class="btn btn-primary">
+            Próxima Semana
+            <i class="bi bi-caret-right"></i>     
+        </a>
+    </div>
+    <br/>
+
+    <div>
+        {% block results%}
+        {% endblock %}
+    </div>
+</div>
+
+{% endblock %}
+

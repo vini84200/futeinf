@@ -2,6 +2,7 @@
 
 pub mod prelude;
 
+pub mod apuracao;
 pub mod ballot;
 pub mod jogador;
 pub mod jogo;

@@ -1,0 +1,33 @@
+{% extends "week_ranking_layout.html" %} {% block title %} FuteINF {% endblock
+%} {% block results%}
+<span class="badge badge-pill text-bg-primary"> Gerado em {{ gerado }} </span>
+
+<span class="badge badge-pill text-bg-secondary">
+    Votos computados: {{ votes }}
+</span>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th scope="col">#</th>
+            <th scope="col">Nome</th>
+            <th scope="col">Percentil</th>
+            <th scope="col">Desvio Padrão</th>
+            <th scope="col">Votos</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for player in ranking %}
+        <tr>
+            <th scope="row">{{ player.pos }}</th>
+            <td>{{ player.nome }}</td>
+            <td>{{ player.media | as_percent }}</td>
+            <td>σ = {{ player.desvio_padrao | as_percent }}</td>
+            <td>{{ player.votos }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<a href="/" class="btn btn-primary">Voltar</a>
+
+{% endblock %}

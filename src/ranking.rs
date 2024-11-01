@@ -1,38 +1,141 @@
 use std::collections::HashMap;
-use crate::error::Result;
-use crate::ranking::{get_or_create_apuracao, RankingEntry};
-use crate::timings::{self, get_last_ref_point, get_ref_point_of, ref_point_from_id, ref_point_id};
-use actix_web::{get, web, HttpResponse, Responder};
+
 use actix_web::web::Data;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use anyhow::ensure;
+use chrono::{DateTime, Utc};
 use itertools::Itertools;
-use chrono::prelude::*;
-use log::{info, log};
-use serde::Serialize;
-use crate::AppState;
-use crate::entities::{ballot, jogador};
-use crate::entities::ballot::Column::Vote;
-use crate::entities::prelude::{Ballot, Jogador};
-use crate::templates::TEMPLATES;
-use anyhow::anyhow;
+use log::info;
+use rand::Rng;
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter,
+};
+use serde::{Deserialize, Serialize};
 
+use crate::entities::prelude::{Apuracao, Ballot};
+use crate::error::Result;
+use crate::timings::ref_point_from_id;
+use crate::{
+    entities::{
+        apuracao::{self},
+        ballot,
+        prelude::Jogador
+    },
+    services::ranking,
+    AppState,
+};
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RankingEntry {
+    pub pos: i32,
+    pub nome: String,
+    pub media: f32,
+    pub votos: i32,
+    pub desvio_padrao: Option<f32>
+}
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Ranking {
+    pub entries: Vec<RankingEntry>,
+    pub timestamp: DateTime<Utc>,
+    pub votes: i32,
+}
 
-#[get("/debugRanking")]
-pub async fn debug_ranking(state: Data<AppState>) -> Result<impl Responder> {
+const APURACAO_COMPLETE: &str = "complete";
+const APURACAO_STARTED: &str = "started";
+
+pub async fn prepare_apurar(state: Data<AppState>, id: i32) -> Result<()> {
+    info!("Preparing apurar for event {}", id);
+    // Fecha ballots
     let db = &state.db;
+    let ballots = Ballot::find()
+        .filter(ballot::Column::State.eq("open"))
+        .filter(ballot::Column::FuteId.eq(id))
+        .all(db)
+        .await?;
 
-    let now = Utc::now();
+    info!("Found {} open ballots", ballots.len());
+    for ballot in ballots {
+        let mut am = ballot.into_active_model();
+        am.state = ActiveValue::Set("closed".to_string());
+        am.save(db).await?;
+    }
+    info!("Closed all ballots");
 
+    info!("Apurar prepared");
+
+    Ok(())
+}
+
+pub async fn has_apurado(state: Data<AppState>, id: i32) -> Result<bool> {
+    let db = &state.db;
+    let apuracao = Apuracao::find()
+        .filter(apuracao::Column::WeekId.eq(id))
+        .one(db)
+        .await?;
+
+    Ok(apuracao.is_some())
+}
+
+pub async fn get_or_create_apuracao(state: Data<AppState>, id: i32) -> Result<Ranking> {
+    let db = &state.db;
+    let apuracao = Apuracao::find()
+        .filter(apuracao::Column::WeekId.eq(id))
+        .one(db)
+        .await?;
+
+    if let Some(apuracao) = apuracao {
+        if apuracao.state != APURACAO_COMPLETE {
+            return Err(anyhow::anyhow!("Apuração não está completa").into());
+        }
+        let ranking = apuracao.results;
+        let ranking = serde_json::from_value::<Ranking>(ranking)?;
+        Ok(ranking)
+    } else {
+        apurar_complete(state.clone(), id).await
+    }
+}
+
+pub async fn apurar_complete(state: Data<AppState>, id: i32) -> Result<Ranking> {
+    // Cria instancia de apuração, como id é unique key, se já existir, retorna erro
+    let db = &state.clone().db;
+
+    let rand_id = rand::thread_rng().gen::<i32>();
+
+    let nova_apuracao = apuracao::ActiveModel {
+        week_id: ActiveValue::Set(id),
+        random_id: ActiveValue::Set(rand_id.to_string()),
+        results: ActiveValue::Set(serde_json::to_value(Ranking {
+            entries: vec![],
+            timestamp: Utc::now(),
+            votes: 0,
+        })?),
+        state: ActiveValue::Set(APURACAO_STARTED.to_string()),
+        ..Default::default()
+    };
+    let mut nova_apuracao = nova_apuracao.save(db).await?;
+
+    // Prepara apuração
+    prepare_apurar(state.clone(), id).await?;
+
+    let ranking = calculate_ranking(state, id).await?;
+
+    nova_apuracao.results = ActiveValue::Set(serde_json::to_value(&ranking)?);
+    nova_apuracao.state = ActiveValue::Set(APURACAO_COMPLETE.to_string());
+    nova_apuracao.save(db).await?;
+
+    Ok(ranking)
+}
+
+pub async fn calculate_ranking(state: Data<AppState>, id: i32) -> Result<Ranking> {
+    let db = &state.clone().db;
     // Get the start of the week, ie. the last monday
-    let start_of_week = get_ref_point_of(now);
+    let start_of_week = ref_point_from_id(id);
 
     // COMPUTE RANKING
     // Get all votes this week
     let votes = Ballot::find()
         .filter(ballot::Column::State.contains("closed"))
-        .filter(ballot::Column::Date.gt(start_of_week))
+        .filter(ballot::Column::FuteId.eq(id))
         .all(db)
         .await?;
 
@@ -120,7 +223,7 @@ pub async fn debug_ranking(state: Data<AppState>) -> Result<impl Responder> {
         let mean = mean.get(k).unwrap();
         let sum = v.iter().map(|(vote, weight)| (vote - mean).powi(2) * weight).sum::<f32>();
         let weight = v.iter().map(|(_, weight)| weight).sum::<f32>();
-        let non_zero_weight_votes = v.iter().filter(|(vote, weight)| *weight > 0.).count();
+        let non_zero_weight_votes = v.iter().filter(|(_, weight)| *weight > 0.).count();
         if non_zero_weight_votes == 0 {
             (*k, 0.)
         } else {
@@ -154,61 +257,18 @@ pub async fn debug_ranking(state: Data<AppState>) -> Result<impl Responder> {
         player.pos = (i + 1) as i32;
     }
 
-    let players_mentioned = players_mentioned.iter().sorted_by(|a, b| a.pos.cmp(&b.pos)).collect_vec();
-
-
-
-
-
-
-
-    let mut context = tera::Context::new();
-    context.insert("votes", &votes.iter().count());
-    context.insert("last_reset", &start_of_week.with_timezone(&Local).format("%d/%m/%Y %H:%M:%S").to_string());
-    context.insert("now", &Utc::now().with_timezone(&Local).format("%d/%m/%Y %H:%M:%S").to_string());
-    context.insert("ranking", &players_mentioned);
-    context.insert("ref_point_id", &ref_point_id(now));
-    let page_content = TEMPLATES.render("debug_ranking.html", &context)?;
-    Ok(HttpResponse::Ok().body(page_content))
-}
-
-
-#[get("/week_ranking/{week_id}")]
-pub async fn week_ranking(
-    week_id: web::Path<i32>,
-    state: Data<AppState>,
-) -> Result<impl Responder> {
-    let week_id = week_id.into_inner();
-    let ref_point = ref_point_from_id(week_id);
-    let semana = ref_point.with_timezone(&Local).format("%d/%m/%Y %H:%M:%S").to_string();
-
-    // Checa se ja é possivel ver o ranking da semana
-    if !timings::publish_results(ref_point) {
-        // Não é possivel ver o ranking da semana
-        // TODO: Fazer uma página de erro com uma função fácil
-        let publication_time = timings::publish_time(ref_point);
-        let publication_time = publication_time.with_timezone(&Local).format("%d/%m/%Y %H:%M:%S").to_string();
-        let mut context = tera::Context::new();
-        context.insert("semana", &semana);
-        context.insert("week_id", &week_id);
-        context.insert("data_publicacao", &publication_time);
-
-        let page_content = TEMPLATES.render("week_ranking_not_published.html", &context)?;
-        return Ok(HttpResponse::Ok().body(page_content))
-    }
-
-    // Checa se a semana já foi apurada
-    // Se não foi, apura a semana
-    let ranking = get_or_create_apuracao(state, week_id).await?;
-
+    let players_mentioned = players_mentioned.iter()
+    .sorted_by(|a, b| a.pos.cmp(&b.pos))
+    .cloned()
+    .collect_vec();
     
-    let mut context = tera::Context::new();
-    context.insert("semana", &semana);
-    context.insert("gerado", &ranking.timestamp.with_timezone(&Local).format("%d/%m/%Y %H:%M:%S").to_string());
-    context.insert("ranking", &ranking.entries);
-    context.insert("votes", &ranking.votes);
-    context.insert("week_id", &week_id);
+    let ranking = Ranking {
+        entries: players_mentioned,
+        timestamp: Utc::now(),
+        votes: votes.len() as i32,
+    };
 
-    let page_content = TEMPLATES.render("week_ranking.html", &context)?;
-    Ok(HttpResponse::Ok().body(page_content))
-} 
+    Ok(
+        ranking
+    )
+}

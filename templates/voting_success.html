@@ -13,5 +13,16 @@
 
 <a href="/" class="btn btn-primary">Voltar</a>
 
+<button
+  hx-post="/voting/create"
+  hx-trigger="click"
+  hx-swap="innerHTML"
+  hx-target="body"
+  class="btn btn-primary"
+  >
+  <i class="bi bi-card-checklist"></i>
+  Votar novamente
+</button>
+
 {% endblock %}
 

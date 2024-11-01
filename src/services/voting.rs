@@ -136,6 +136,10 @@ pub async fn vote(state: Data<AppState>, path: web::Path<u32>,
             });
         }
         context.insert("players", &players);
+        let semana = ref_point_from_id(ballot.fute_id as i32);
+        context.insert("semana", &semana.format("%d/%m/%Y").to_string());
+        context.insert("week_id", &ballot.fute_id);
+
         let page_content = TEMPLATES.render("voting.html", &context)?;
         Ok(HttpResponse::Ok().body(page_content))
     } else {

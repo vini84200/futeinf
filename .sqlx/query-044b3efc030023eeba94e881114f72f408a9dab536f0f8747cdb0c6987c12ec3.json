@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT ticket_id_fk, field_value, field_configuration_id_fk FROM all_ticket_field_values \n            WHERE field_configuration_id_fk = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ticket_id_fk",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "field_value",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "field_configuration_id_fk",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "044b3efc030023eeba94e881114f72f408a9dab536f0f8747cdb0c6987c12ec3"
+}

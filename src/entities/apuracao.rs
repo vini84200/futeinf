@@ -3,17 +3,16 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "ballot")]
+#[sea_orm(table_name = "apuracao")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
-    pub players: Json,
-    pub vote: Json,
-    pub date: DateTimeUtc,
-    pub voter: String,
-    pub fute_id: i32,
-    #[sea_orm(column_type = "custom(\"enum_text\")")]
+    #[sea_orm(unique)]
+    pub week_id: i32,
+    #[sea_orm(unique)]
+    pub random_id: String,
     pub state: String,
+    pub results: Json,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

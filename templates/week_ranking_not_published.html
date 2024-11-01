@@ -1,0 +1,25 @@
+{% extends "week_ranking_layout.html" %} {% block title %} FuteINF {% endblock
+%} {% block results%}
+
+<div
+    class="alert alert-warning"
+    role="alert"
+>
+    <strong>Ranking ainda não está disponivel</strong> 
+    <br>
+    <hr>
+    <p>
+        O ranking da semana {{ semana }} ainda não foi publicado.
+    </p>
+    <p>
+        Aguarde a publicação do ranking para visualizar a classificação dos times.
+    </p>
+    <p>
+        Data de publicação prevista: {{ data_publicacao }}
+    </p>
+</div>
+
+
+<a href="/" class="btn btn-primary">Voltar</a>
+
+{% endblock %}

@@ -1,8 +1,10 @@
 use crate::templates::TEMPLATES;
+use crate::timings::ref_point_id;
 use crate::{list, AppState};
 use actix_identity::Identity;
 use actix_web::web::Data;
 use actix_web::{get, HttpResponse, Responder};
+use chrono::Utc;
 
 #[get("/")]
 pub async fn index(
@@ -16,6 +18,9 @@ pub async fn index(
         context.insert("logged_in", &false);
         context.insert("username", &"");
     }
+    let week_id = ref_point_id(Utc::now());
+    let last_week = week_id - 1;
+    context.insert("last_week", &last_week);
     let page_content = TEMPLATES.render("index.html", &context)?;
     Ok(HttpResponse::Ok().body(page_content))
 }

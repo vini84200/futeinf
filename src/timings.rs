@@ -69,9 +69,13 @@ pub fn can_cast_vote(rf: DateTime<Utc>) -> bool {
     
 }
 
-pub fn publish_results(date: DateTime<Utc>) -> bool {
+pub fn publish_time(date: DateTime<Utc>) -> DateTime<Utc> {
     let end = get_end_voting(date);
-    let start_publish = end + Duration::minutes(90);
+    end + Duration::minutes(90)
+}
+
+pub fn publish_results(date: DateTime<Utc>) -> bool {
+    let start_publish = publish_time(date);
     let now = Utc::now();
     now >= start_publish
 }

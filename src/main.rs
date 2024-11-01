@@ -23,6 +23,7 @@ mod templates;
 mod entities;
 mod error;
 mod timings;
+mod ranking;
 
 
 pub struct AppState {
@@ -86,6 +87,7 @@ async fn main() -> std::io::Result<()> {
             .service(services::voting::voting_create)
             .service(services::voting::vote_success)
             .service(services::ranking::debug_ranking)
+            .service(services::ranking::week_ranking)
             .service(services::auth::login_form)
             .service(services::auth::login)
             .service(services::auth::logout)
