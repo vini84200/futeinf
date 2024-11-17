@@ -2,18 +2,18 @@
 <div 
   class="row"
   >
-<h1>Lista do Fute</h1>
+<h1>Fute do INF</h1>
 </div>
 
 {% if logged_in %}
 <span>
-  Hello {{ username }}!
+  Olá {{ username }}!
   <button
     class="btn btn-primary"
     hx-post="/logout"
     >
-    <i class="bi bi-plus"></i>
-    Logout
+    <i class="bi bi-door-open"></i>
+    Sair
   </button>
 </span>
 {% else %}
@@ -21,15 +21,16 @@
   class="row"
   >
   <div class="col-5">
-<a
-  href="/login"
-  class="btn btn-primary"
-  >
-  <i class="bi bi-plus"></i>
-  Login
-</a>
+    <a
+      href="/login"
+      class="btn btn-primary"
+      >
+      <i class="bi bi-plus"></i>
+      Login
+    </a>
   </div>
-  {% endif %}
+</div>
+{% endif %}
 
 
 {# <div 
@@ -50,9 +51,10 @@
   >
   <div hx-get="/jogadores" hx-trigger="load,every 10s" hx-swap="innerHTML"></div>
 </div> #}
-</div>
+{% if logged_in %}
 <br>
 <hr>
+<div class="container">
 
 <button
   hx-post="/voting/create"
@@ -71,5 +73,7 @@
   >
   Ver Ranking da Semana Anterior
 </a>
+</div>
+  {% endif %}
 {% endblock %}
 
