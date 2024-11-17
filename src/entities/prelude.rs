@@ -4,3 +4,4 @@ pub use super::apuracao::Entity as Apuracao;
 pub use super::ballot::Entity as Ballot;
 pub use super::jogador::Entity as Jogador;
 pub use super::jogo::Entity as Jogo;
+pub use super::lista_extra::Entity as ListaExtra;

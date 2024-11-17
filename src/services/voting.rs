@@ -1,6 +1,6 @@
 use crate::templates::TEMPLATES;
 use crate::timings::{can_cast_vote, can_create_ballot, get_end_elegible_check, get_ref_point_of, get_start_elegible_check, ref_point_from_id, ref_point_id};
-use crate::{entities, list, AppState, error::Result};
+use crate::{entities, list, AppState};
 use sqlx::{prelude::*, query, query_as};
 use actix_identity::Identity;
 use actix_web::web::Data;
@@ -11,20 +11,65 @@ use rand::prelude::SliceRandom;
 use sea_orm::{ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Deserializer};
 use entities::{prelude::*, *};
-use crate::error::Error;
+use crate::error::{Error, Result};
 
 #[get("/voting")]
-pub async fn voting(state: Data<AppState>) -> crate::error::Result<impl Responder> {
+pub async fn voting(state: Data<AppState>) -> Result<impl Responder> {
     let context = tera::Context::new();
     let page_content = TEMPLATES.render("voting.html", &context)?;
     Ok(HttpResponse::Ok().body(page_content))
+}
+
+#[get("/elegible")]
+pub async fn get_elegible_players(
+    state: Data<AppState>,
+    identity: Option<Identity>
+) -> Result<impl Responder> {
+    let identity = identity.ok_or(anyhow!("Not logged in"))?;
+    let db = &state.db;
+    let now = chrono::Utc::now();
+
+    let start_elegible_check = get_start_elegible_check(now);
+    let end_elegible_check = get_end_elegible_check(now);
+
+    let all_players : Vec<jogador::Model> = Jogador::find().all(db).await?;
+
+
+    // Filter for players that have been active in the last 30 days
+    let players: Vec<_> = query!(
+        "select distinct email_address as email FROM ticket WHERE event_id IN 
+        (SELECT id FROM event WHERE start_ts between $1 and $2)
+         and email_address is not null;",
+        start_elegible_check,
+        end_elegible_check
+    ).fetch_all(&state.alfio_db).await?;
+
+    let extra_players = ListaExtra::find()
+        .filter(lista_extra::Column::Data.gt(start_elegible_check))
+        .filter(lista_extra::Column::Data.lt(end_elegible_check))
+        .all(db)
+        .await?;
+
+    let extra_players = extra_players.iter().map(|f| f.jogador_id).collect::<Vec<_>>();
+
+
+    let players = players.iter().map(|f| f.email.to_owned()).collect::<Option<Vec<_>>>().unwrap_or_default();
+    info!("Players: {:?}", players);
+    let elegible_players = all_players.iter().filter(|x| players.contains(&x.email) || extra_players.contains(&x.id)).collect::<Vec<_>>();
+
+    info!("Elegible players({}): {:?}", elegible_players.len(), elegible_players);
+
+    Ok(
+        HttpResponse::Ok()
+            .json(elegible_players.iter().map(|x| x.apelido.to_owned()).collect::<Vec<String>>())
+    )
 }
 
 #[post("/voting/create")]
 pub async fn voting_create(
     state: Data<AppState>, 
     identity: Option<Identity>
-) -> crate::error::Result<impl Responder> {
+) -> Result<impl Responder> {
 
     let identity = identity.ok_or(anyhow!("Not logged in"))?;
 
@@ -72,9 +117,18 @@ pub async fn voting_create(
         end_elegible_check
     ).fetch_all(&state.alfio_db).await?;
 
+    let extra_players = ListaExtra::find()
+        .filter(lista_extra::Column::Data.gt(start_elegible_check))
+        .filter(lista_extra::Column::Data.lt(end_elegible_check))
+        .all(db)
+        .await?;
+
+    let extra_players = extra_players.iter().map(|f| f.jogador_id).collect::<Vec<_>>();
+
+
     let players = players.iter().map(|f| f.email.to_owned()).collect::<Option<Vec<_>>>().unwrap_or_default();
     info!("Players: {:?}", players);
-    let elegible_players = all_players.iter().filter(|x| players.contains(&x.email)).collect::<Vec<_>>();
+    let elegible_players = all_players.iter().filter(|x| players.contains(&x.email) || extra_players.contains(&x.id)).collect::<Vec<_>>();
 
     info!("Elegible players({}): {:?}", elegible_players.len(), elegible_players);
 
@@ -111,7 +165,7 @@ pub async fn voting_create(
 #[get("/voting/{ballot_id}")]
 pub async fn vote(state: Data<AppState>, path: web::Path<u32>,
     identity: Option<Identity>
-) -> crate::error::Result<impl Responder> {
+) -> Result<impl Responder> {
     let identity = identity.ok_or(anyhow!("Not logged in"))?;
     let ballot_id = path.into_inner();
     // Get players and add them to the context
@@ -160,7 +214,7 @@ pub async fn vote_submit(
     path: web::Path<u32>,
     cast_vote: web::Json<CastVote>,
     identity: Option<Identity>,
-) -> crate::error::Result<impl Responder> {
+) -> Result<impl Responder> {
     let ballot_id = path.into_inner();
     let identity = identity.ok_or(anyhow!("Not logged in"))?;
 

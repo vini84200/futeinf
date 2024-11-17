@@ -86,6 +86,7 @@ async fn main() -> std::io::Result<()> {
             .service(services::voting::vote_submit)
             .service(services::voting::voting_create)
             .service(services::voting::vote_success)
+            .service(services::voting::get_elegible_players)
             .service(services::ranking::debug_ranking)
             .service(services::ranking::week_ranking)
             .service(services::auth::login_form)

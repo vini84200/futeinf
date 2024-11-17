@@ -53,11 +53,13 @@ impl MigrationTrait for Migration {
 }
 
 #[derive(DeriveIden)]
-enum Jogador {
+pub(crate) enum Jogador {
     Table,
     Id,
     Nome,
     Apelido,
     Email,
     SenhaHash,
+    // Added by m20241117_150055_lista_extra.rs
+    Admin,
 }
