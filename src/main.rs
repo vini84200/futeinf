@@ -54,7 +54,8 @@ async fn main() -> std::io::Result<()> {
         .connect(&database_url)
         .await
         .expect("Error building a connection pool");
-    let db = Database::connect("sqlite://db.sqlite?mode=rwc").await.expect("Error connecting to the database");
+    let local_db_url = std::env::var("LOCAL_DATABASE_URL").expect("LOCAL_DATABASE_URL must be set");
+    let db = Database::connect(local_db_url).await.expect("Error connecting to the database");
     Migrator::up(&db, None).await.expect("Error running migrations");
     HttpServer::new(move || {
         let identity = IdentityMiddleware::builder()

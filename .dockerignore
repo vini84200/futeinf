@@ -2,3 +2,7 @@
 db.sqlite
 target
 Dockerfile
+docker-compose.yml
+production
+db
+.gitignore
