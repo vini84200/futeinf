@@ -1,8 +1,6 @@
-use std::{time::Duration};
+use std::time::Duration;
 
-use actix_web::{
-    cookie::{Key}, web::Data, App, HttpServer
-};
+use actix_web::{cookie::Key, web::Data, App, HttpServer};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use dotenv::dotenv;
 use env_logger::Env;
@@ -11,21 +9,17 @@ use sea_orm::{Database, DatabaseConnection};
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 
 use actix_identity::IdentityMiddleware;
-use actix_session::{
-    storage::CookieSessionStore,
-    SessionMiddleware,
-};
+use actix_session::{storage::CookieSessionStore, SessionMiddleware};
 use tracing_actix_web::TracingLogger;
 
 mod db;
-mod list;
-mod services;
-mod templates;
 mod entities;
 mod error;
-mod timings;
+mod list;
 mod ranking;
-
+mod services;
+mod templates;
+mod timings;
 
 pub struct AppState {
     alfio_db: Pool<Postgres>,
@@ -37,15 +31,15 @@ async fn main() -> std::io::Result<()> {
     dotenv().ok();
 
     env_logger::init_from_env(Env::default().default_filter_or("info"));
-    let cookie_key_master_str = std::env::var("COOKIE_KEY_MASTER").expect("COOKIE_KEY_MASTER must be set");
-    let cookie_key_master = STANDARD.decode( cookie_key_master_str.as_bytes() )
+    let cookie_key_master_str =
+        std::env::var("COOKIE_KEY_MASTER").expect("COOKIE_KEY_MASTER must be set");
+    let cookie_key_master = STANDARD
+        .decode(cookie_key_master_str.as_bytes())
         .expect("Error decoding COOKIE_KEY_MASTER");
     if cookie_key_master.len() != 32 {
         panic!("COOKIE_KEY_MASTER must be 32 bytes long");
-    }   
+    }
     let cookie_key = Key::derive_from(&cookie_key_master);
-
-
 
     // Database
 
@@ -56,8 +50,12 @@ async fn main() -> std::io::Result<()> {
         .await
         .expect("Error building a connection pool");
     let local_db_url = std::env::var("LOCAL_DATABASE_URL").expect("LOCAL_DATABASE_URL must be set");
-    let db = Database::connect(local_db_url).await.expect("Error connecting to the database");
-    Migrator::up(&db, None).await.expect("Error running migrations");
+    let db = Database::connect(local_db_url)
+        .await
+        .expect("Error connecting to the database");
+    Migrator::up(&db, None)
+        .await
+        .expect("Error running migrations");
     HttpServer::new(move || {
         let identity = IdentityMiddleware::builder()
             .visit_deadline(Some(Duration::from_secs(60 * 60 * 24 * 7)))
@@ -75,7 +73,6 @@ async fn main() -> std::io::Result<()> {
                 CookieSessionStore::default(),
                 cookie_key.clone(),
             ))
-
             .app_data(Data::new(AppState {
                 alfio_db: pool.clone(),
                 db: db.clone(),
@@ -94,7 +91,7 @@ async fn main() -> std::io::Result<()> {
             .service(services::auth::login)
             .service(services::auth::logout)
     })
-        .bind(("0.0.0.0", 8080))?
-        .run()
-        .await
+    .bind(("0.0.0.0", 8080))?
+    .run()
+    .await
 }

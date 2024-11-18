@@ -19,35 +19,21 @@ impl MigrationTrait for Migration {
                             .primary_key()
                             .not_null(),
                     )
-                    .col(
-                        ColumnDef::new(Jogador::Nome)
-                            .string()
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(Jogador::Apelido)
-                            .string()
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(Jogador::Email)
-                            .string()
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(Jogador::SenhaHash)
-                            .string()
-                            .not_null(),
-                    )
-                    .to_owned()
-            ).await?;
+                    .col(ColumnDef::new(Jogador::Nome).string().not_null())
+                    .col(ColumnDef::new(Jogador::Apelido).string().not_null())
+                    .col(ColumnDef::new(Jogador::Email).string().not_null())
+                    .col(ColumnDef::new(Jogador::SenhaHash).string().not_null())
+                    .to_owned(),
+            )
+            .await?;
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         // Replace the sample below with your own migration scripts
         manager
-            .drop_table(Table::drop().table(Jogador::Table).to_owned()).await?;
+            .drop_table(Table::drop().table(Jogador::Table).to_owned())
+            .await?;
         Ok(())
     }
 }

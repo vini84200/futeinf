@@ -1,17 +1,20 @@
+use crate::error::{Error, Result};
 use crate::templates::TEMPLATES;
-use crate::timings::{can_cast_vote, can_create_ballot, get_end_elegible_check, get_ref_point_of, get_start_elegible_check, ref_point_from_id, ref_point_id};
+use crate::timings::{
+    can_cast_vote, can_create_ballot, get_end_elegible_check, get_ref_point_of,
+    get_start_elegible_check, ref_point_from_id, ref_point_id,
+};
 use crate::{entities, list, AppState};
-use sqlx::{prelude::*, query};
 use actix_identity::Identity;
 use actix_web::web::Data;
 use actix_web::{get, post, web, HttpResponse, Responder};
 use anyhow::anyhow;
+use entities::{prelude::*, *};
 use log::info;
 use rand::prelude::SliceRandom;
 use sea_orm::{ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, QueryFilter};
 use serde::Deserialize;
-use entities::{prelude::*, *};
-use crate::error::{Error, Result};
+use sqlx::{prelude::*, query};
 
 #[get("/voting")]
 pub async fn voting(state: Data<AppState>) -> Result<impl Responder> {
@@ -23,7 +26,7 @@ pub async fn voting(state: Data<AppState>) -> Result<impl Responder> {
 #[get("/elegible")]
 pub async fn get_elegible_players(
     state: Data<AppState>,
-    identity: Option<Identity>
+    identity: Option<Identity>,
 ) -> Result<impl Responder> {
     let identity = identity.ok_or(anyhow!("Not logged in"))?;
     let db = &state.db;
@@ -32,8 +35,7 @@ pub async fn get_elegible_players(
     let start_elegible_check = get_start_elegible_check(now);
     let end_elegible_check = get_end_elegible_check(now);
 
-    let all_players : Vec<jogador::Model> = Jogador::find().all(db).await?;
-
+    let all_players: Vec<jogador::Model> = Jogador::find().all(db).await?;
 
     // Filter for players that have been active in the last 30 days
     let players: Vec<_> = query!(
@@ -42,7 +44,9 @@ pub async fn get_elegible_players(
          and email_address is not null;",
         start_elegible_check,
         end_elegible_check
-    ).fetch_all(&state.alfio_db).await?;
+    )
+    .fetch_all(&state.alfio_db)
+    .await?;
 
     let extra_players = ListaExtra::find()
         .filter(lista_extra::Column::Data.gt(start_elegible_check))
@@ -50,27 +54,41 @@ pub async fn get_elegible_players(
         .all(db)
         .await?;
 
-    let extra_players = extra_players.iter().map(|f| f.jogador_id).collect::<Vec<_>>();
+    let extra_players = extra_players
+        .iter()
+        .map(|f| f.jogador_id)
+        .collect::<Vec<_>>();
 
-
-    let players = players.iter().map(|f| f.email.to_owned()).collect::<Option<Vec<_>>>().unwrap_or_default();
+    let players = players
+        .iter()
+        .map(|f| f.email.to_owned())
+        .collect::<Option<Vec<_>>>()
+        .unwrap_or_default();
     info!("Players: {:?}", players);
-    let elegible_players = all_players.iter().filter(|x| players.contains(&x.email) || extra_players.contains(&x.id)).collect::<Vec<_>>();
+    let elegible_players = all_players
+        .iter()
+        .filter(|x| players.contains(&x.email) || extra_players.contains(&x.id))
+        .collect::<Vec<_>>();
 
-    info!("Elegible players({}): {:?}", elegible_players.len(), elegible_players);
+    info!(
+        "Elegible players({}): {:?}",
+        elegible_players.len(),
+        elegible_players
+    );
 
-    Ok(
-        HttpResponse::Ok()
-            .json(elegible_players.iter().map(|x| x.apelido.to_owned()).collect::<Vec<String>>())
-    )
+    Ok(HttpResponse::Ok().json(
+        elegible_players
+            .iter()
+            .map(|x| x.apelido.to_owned())
+            .collect::<Vec<String>>(),
+    ))
 }
 
 #[post("/voting/create")]
 pub async fn voting_create(
-    state: Data<AppState>, 
-    identity: Option<Identity>
+    state: Data<AppState>,
+    identity: Option<Identity>,
 ) -> Result<impl Responder> {
-
     let identity = identity.ok_or(anyhow!("Not logged in"))?;
 
     let db = &state.db;
@@ -85,15 +103,13 @@ pub async fn voting_create(
         .filter(ballot::Column::State.eq("open"))
         .filter(ballot::Column::Voter.eq(identity.id().unwrap()))
         .one(db)
-        .await?
-    ;
+        .await?;
 
     if let Some(b) = alredy_open_ballot {
         // Send the user to the voting page
         return Ok(HttpResponse::Ok()
             .append_header(("HX-Redirect", format!("/voting/{}", b.id)))
-            .body("Voting created")
-        )
+            .body("Voting created"));
     }
 
     // Check if we can create a ballot
@@ -105,8 +121,7 @@ pub async fn voting_create(
     let start_elegible_check = get_start_elegible_check(now);
     let end_elegible_check = get_end_elegible_check(now);
 
-    let all_players : Vec<jogador::Model> = Jogador::find().all(db).await?;
-
+    let all_players: Vec<jogador::Model> = Jogador::find().all(db).await?;
 
     // Filter for players that have been active in the last 30 days
     let players: Vec<_> = query!(
@@ -115,7 +130,9 @@ pub async fn voting_create(
          and email_address is not null;",
         start_elegible_check,
         end_elegible_check
-    ).fetch_all(&state.alfio_db).await?;
+    )
+    .fetch_all(&state.alfio_db)
+    .await?;
 
     let extra_players = ListaExtra::find()
         .filter(lista_extra::Column::Data.gt(start_elegible_check))
@@ -123,26 +140,39 @@ pub async fn voting_create(
         .all(db)
         .await?;
 
-    let extra_players = extra_players.iter().map(|f| f.jogador_id).collect::<Vec<_>>();
+    let extra_players = extra_players
+        .iter()
+        .map(|f| f.jogador_id)
+        .collect::<Vec<_>>();
 
-
-    let players = players.iter().map(|f| f.email.to_owned()).collect::<Option<Vec<_>>>().unwrap_or_default();
+    let players = players
+        .iter()
+        .map(|f| f.email.to_owned())
+        .collect::<Option<Vec<_>>>()
+        .unwrap_or_default();
     info!("Players: {:?}", players);
-    let elegible_players = all_players.iter().filter(|x| players.contains(&x.email) || extra_players.contains(&x.id)).collect::<Vec<_>>();
+    let elegible_players = all_players
+        .iter()
+        .filter(|x| players.contains(&x.email) || extra_players.contains(&x.id))
+        .collect::<Vec<_>>();
 
-    info!("Elegible players({}): {:?}", elegible_players.len(), elegible_players);
+    info!(
+        "Elegible players({}): {:?}",
+        elegible_players.len(),
+        elegible_players
+    );
 
     if elegible_players.len() < 5 {
-        return Ok(HttpResponse::BadRequest().body("Not enough players to create a ballot"));    
+        return Ok(HttpResponse::BadRequest().body("Not enough players to create a ballot"));
     }
 
     // Get 5 random players
-    let players = elegible_players.choose_multiple(&mut rand::thread_rng(), 5)
+    let players = elegible_players
+        .choose_multiple(&mut rand::thread_rng(), 5)
         .cloned()
         .collect::<Vec<&jogador::Model>>();
 
     let players_json = serde_json::json!(players.iter().map(|x| x.id).collect::<Vec<i32>>());
-
 
     // TODO: Check if the event exists and has voting enabled
     let ballot = ballot::ActiveModel {
@@ -158,13 +188,14 @@ pub async fn voting_create(
     let ballot = ballot.save(db).await?;
     Ok(HttpResponse::Ok()
         .append_header(("HX-Redirect", format!("/voting/{}", ballot.id.unwrap())))
-        .body("Voting created")
-    )
+        .body("Voting created"))
 }
 
 #[get("/voting/{ballot_id}")]
-pub async fn vote(state: Data<AppState>, path: web::Path<u32>,
-    identity: Option<Identity>
+pub async fn vote(
+    state: Data<AppState>,
+    path: web::Path<u32>,
+    identity: Option<Identity>,
 ) -> Result<impl Responder> {
     let identity = identity.ok_or(anyhow!("Not logged in"))?;
     let ballot_id = path.into_inner();
@@ -175,13 +206,18 @@ pub async fn vote(state: Data<AppState>, path: web::Path<u32>,
     let ballot: Option<ballot::Model> = Ballot::find_by_id(ballot_id as i32).one(db).await?;
     if let Some(ballot) = ballot {
         if ballot.voter != identity.id().unwrap() {
-            return Ok(HttpResponse::Unauthorized().body("You are not allowed to vote on this ballot"));
+            return Ok(
+                HttpResponse::Unauthorized().body("You are not allowed to vote on this ballot")
+            );
         }
         let mut context = tera::Context::new();
         context.insert("ballot_id", &ballot_id);
         let players_ids: Vec<i32> = serde_json::from_value(ballot.players)?;
         for player_id in players_ids {
-            let player = Jogador::find_by_id(player_id).one(db).await?.ok_or(anyhow!("Player not found"))?;
+            let player = Jogador::find_by_id(player_id)
+                .one(db)
+                .await?
+                .ok_or(anyhow!("Player not found"))?;
 
             players.push(list::Jogador {
                 id: player.id,
@@ -199,8 +235,6 @@ pub async fn vote(state: Data<AppState>, path: web::Path<u32>,
     } else {
         Ok(HttpResponse::NotFound().body("Ballot not found"))
     }
-
-
 }
 
 #[derive(Deserialize, Debug)]
@@ -218,9 +252,11 @@ pub async fn vote_submit(
     let ballot_id = path.into_inner();
     let identity = identity.ok_or(anyhow!("Not logged in"))?;
 
-
     let db = &state.db;
-    let ballot: ballot::Model = Ballot::find_by_id(ballot_id as i32).one(db).await?.ok_or(anyhow!("Ballot not found"))?;
+    let ballot: ballot::Model = Ballot::find_by_id(ballot_id as i32)
+        .one(db)
+        .await?
+        .ok_or(anyhow!("Ballot not found"))?;
     if ballot.voter != identity.id().unwrap() {
         return Ok(HttpResponse::Unauthorized().body("You are not allowed to vote on this ballot"));
     }
@@ -235,13 +271,13 @@ pub async fn vote_submit(
 
     info!("Ballot: {:?}", ballot);
     info!("Cast vote: {:?}", cast_vote);
-    let cast_vote = cast_vote.players.iter()
-
-        .map(|x| x.parse::<i32>().map_err( |_|
-            Error::UnexpectedError(
-                anyhow::Error::msg("Failed to parse vote")
-            )
-        ))
+    let cast_vote = cast_vote
+        .players
+        .iter()
+        .map(|x| {
+            x.parse::<i32>()
+                .map_err(|_| Error::UnexpectedError(anyhow::Error::msg("Failed to parse vote")))
+        })
         .collect::<Result<Vec<i32>>>()?;
     info!("Cast vote: {:?}", cast_vote);
     let v = serde_json::to_value(cast_vote.clone())?;
@@ -250,18 +286,28 @@ pub async fn vote_submit(
         state: ActiveValue::Set("closed".to_string()),
         id: ActiveValue::Set(ballot_id as i32),
         ..Default::default()
-    }.update(db).await?;
+    }
+    .update(db)
+    .await?;
     info!("Ballot updated");
     let mut context = tera::Context::new();
     context.insert("ballot_id", &ballot_id);
-    context.insert("votes", &cast_vote.iter().map(|x| x.to_string()).collect::<Vec<String>>());
+    context.insert(
+        "votes",
+        &cast_vote
+            .iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<String>>(),
+    );
     println!("Votes: {:?}", cast_vote);
     Ok(HttpResponse::Ok().body("Voto computado"))
 }
 
 #[get("/voting/{ballot_id}/success")]
-pub async fn vote_success(state: Data<AppState>, path: web::Path<u32>,
-    identity: Option<Identity>
+pub async fn vote_success(
+    state: Data<AppState>,
+    path: web::Path<u32>,
+    identity: Option<Identity>,
 ) -> Result<impl Responder> {
     let identity = identity.ok_or(anyhow!("Not logged in"))?;
     let ballot_id = path.into_inner();
@@ -269,14 +315,19 @@ pub async fn vote_success(state: Data<AppState>, path: web::Path<u32>,
     let ballot: Option<ballot::Model> = Ballot::find_by_id(ballot_id as i32).one(db).await?;
     if let Some(ballot) = ballot {
         if ballot.voter != identity.id().unwrap() {
-            return Ok(HttpResponse::Unauthorized().body("You are not allowed to vote on this ballot"));
+            return Ok(
+                HttpResponse::Unauthorized().body("You are not allowed to vote on this ballot")
+            );
         }
         let mut context = tera::Context::new();
         context.insert("ballot_id", &ballot_id);
         let votes: Vec<i32> = serde_json::from_value(ballot.vote)?;
         let mut players: Vec<list::Jogador> = vec![];
         for player_id in votes {
-            let player = Jogador::find_by_id(player_id).one(db).await?.ok_or(anyhow!("Player not found"))?;
+            let player = Jogador::find_by_id(player_id)
+                .one(db)
+                .await?
+                .ok_or(anyhow!("Player not found"))?;
             players.push(list::Jogador {
                 id: player.id,
                 nome: player.nome,

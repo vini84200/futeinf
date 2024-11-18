@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use lazy_static::lazy_static;
 use log::info;
 use sea_orm::JsonValue;
+use std::collections::HashMap;
 use tera::{Filter, Tera, Test, Value};
 
 struct IsNaN;
@@ -34,7 +34,7 @@ lazy_static! {
         let source = "templates/**/*.html";
         let mut tera = Tera::new(source).expect("failed to compile template");
         tera.autoescape_on(vec![".html", ".sql"]);
-        tera.register_filter( "as_percent", AsPercent);
+        tera.register_filter("as_percent", AsPercent);
         tera
     };
 }

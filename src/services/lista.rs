@@ -7,9 +7,7 @@ use actix_web::{get, HttpResponse, Responder};
 use chrono::Utc;
 
 #[get("/")]
-pub async fn index(
-    identity: Option<Identity>,
-) -> crate::error::Result<impl Responder> {
+pub async fn index(identity: Option<Identity>) -> crate::error::Result<impl Responder> {
     let mut context = tera::Context::new();
     if let Some(identity) = identity {
         context.insert("logged_in", &true);

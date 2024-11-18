@@ -25,7 +25,6 @@ pub struct TicketFieldValue {
     field_configuration_id_fk: Option<i64>,
 }
 
-
 pub async fn get_list(db: Pool<Postgres>) -> Result<Vec<Jogador>> {
     // TODO: encontrar no bd quais são os ids dos eventos e campo mais recente
     let event_id = 2;
@@ -44,11 +43,11 @@ pub async fn get_list(db: Pool<Postgres>) -> Result<Vec<Jogador>> {
         ",
         campo_camisa
     )
-        .fetch_all(&db)
-        .await?;
+    .fetch_all(&db)
+    .await?;
 
-
-    Ok(tickets_fields.iter()
+    Ok(tickets_fields
+        .iter()
         .map(|fv| {
             let camisa = fv.field_value.clone().unwrap();
             Jogador {
@@ -57,11 +56,9 @@ pub async fn get_list(db: Pool<Postgres>) -> Result<Vec<Jogador>> {
                 id: fv.ticket_id_fk.unwrap(),
             }
         })
-        .collect()
-    )
+        .collect())
 }
 
 pub fn get_max_jogadores() -> usize {
     24
 }
-

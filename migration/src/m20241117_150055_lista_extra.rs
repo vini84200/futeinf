@@ -1,5 +1,5 @@
-use sea_orm_migration::{prelude::*, schema::*};
 use crate::m20241020_003335_create_jogo_e_jogador::Jogador;
+use sea_orm_migration::{prelude::*, schema::*};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -23,33 +23,40 @@ impl MigrationTrait for Migration {
                             .to(Jogador::Table, Jogador::Id),
                     )
                     .to_owned(),
-            ).await?;
-        
+            )
+            .await?;
+
         manager
             .alter_table(
                 Table::alter()
                     .table(Jogador::Table)
-                    .add_column(ColumnDef::new(Jogador::Admin).boolean().not_null().default(false))
-                    .to_owned()
-            ).await?;
-            
+                    .add_column(
+                        ColumnDef::new(Jogador::Admin)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .to_owned(),
+            )
+            .await?;
 
         Ok(())
-
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         // Replace the sample below with your own migration scripts
         manager
-            .drop_table(Table::drop().table(ListaExtra::Table).to_owned()).await?;
+            .drop_table(Table::drop().table(ListaExtra::Table).to_owned())
+            .await?;
 
         manager
             .alter_table(
                 Table::alter()
                     .table(Jogador::Table)
                     .drop_column(Jogador::Admin)
-                    .to_owned()
-            ).await?;
+                    .to_owned(),
+            )
+            .await?;
 
         Ok(())
     }
@@ -60,5 +67,5 @@ enum ListaExtra {
     Table,
     Id,
     JogadorId,
-    Data
+    Data,
 }

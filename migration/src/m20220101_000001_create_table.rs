@@ -13,7 +13,7 @@ enum Ballot {
     Date,
     Voter,
     FuteId,
-    State
+    State,
 }
 
 #[derive(Iden, EnumIter)]
@@ -40,12 +40,16 @@ impl MigrationTrait for Migration {
                     .col(timestamp(Ballot::Date))
                     .col(string_len(Ballot::Voter, 255))
                     .col(integer(Ballot::FuteId))
-                    .col(enumeration(Ballot::State, Alias::new("ballot_state"), BallotState::iter()))
+                    .col(enumeration(
+                        Ballot::State,
+                        Alias::new("ballot_state"),
+                        BallotState::iter(),
+                    ))
                     .to_owned(),
             )
             .await?;
 
-            Ok(())
+        Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {

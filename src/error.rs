@@ -1,5 +1,5 @@
-use actix_web::{HttpResponse, ResponseError};
 use crate::templates::TEMPLATES;
+use actix_web::{HttpResponse, ResponseError};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
