@@ -1,4 +1,4 @@
-use std::{env, time::Duration};
+use std::{time::Duration};
 
 use actix_web::{
     cookie::{Key}, middleware::Logger, web::Data, App, HttpResponse, HttpServer, ResponseError
@@ -15,6 +15,7 @@ use actix_session::{
     storage::CookieSessionStore,
     SessionMiddleware,
 };
+use tracing_actix_web::TracingLogger;
 
 mod db;
 mod list;
@@ -79,8 +80,7 @@ async fn main() -> std::io::Result<()> {
                 alfio_db: pool.clone(),
                 db: db.clone(),
             }))
-            .wrap(Logger::default())
-            .wrap(Logger::new("%a %{User-Agent}i"))
+            .wrap(TracingLogger::default())
             .service(services::lista::index)
             .service(services::lista::jogadores)
             .service(services::voting::vote)
