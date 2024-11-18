@@ -6,6 +6,7 @@ use actix_web::web::Data;
 use actix_web::{get, HttpResponse, Responder};
 use chrono::Utc;
 
+#[tracing::instrument(name = "Render Index", skip(identity))]
 #[get("/")]
 pub async fn index(identity: Option<Identity>) -> crate::error::Result<impl Responder> {
     let mut context = tera::Context::new();
@@ -23,6 +24,7 @@ pub async fn index(identity: Option<Identity>) -> crate::error::Result<impl Resp
     Ok(HttpResponse::Ok().body(page_content))
 }
 
+#[tracing::instrument(name = "Render Jogadores", skip(state))]
 #[get("/jogadores")]
 pub async fn jogadores(state: Data<AppState>) -> crate::error::Result<impl Responder> {
     let mut context = tera::Context::new();

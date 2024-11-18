@@ -6,11 +6,16 @@ use dotenv::dotenv;
 use env_logger::Env;
 use migration::{Migrator, MigratorTrait};
 use sea_orm::{Database, DatabaseConnection};
+use secrecy::{ExposeSecret, SecretBox, SecretString};
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 
 use actix_identity::IdentityMiddleware;
 use actix_session::{storage::CookieSessionStore, SessionMiddleware};
+use tracing::{subscriber, Instrument};
 use tracing_actix_web::TracingLogger;
+use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
+use tracing_subscriber::{layer::SubscriberExt, EnvFilter, Registry};
+use tracing::subscriber::set_global_default;
 
 mod db;
 mod entities;
@@ -30,32 +35,48 @@ pub struct AppState {
 async fn main() -> std::io::Result<()> {
     dotenv().ok();
 
-    env_logger::init_from_env(Env::default().default_filter_or("info"));
-    let cookie_key_master_str =
-        std::env::var("COOKIE_KEY_MASTER").expect("COOKIE_KEY_MASTER must be set");
-    let cookie_key_master = STANDARD
-        .decode(cookie_key_master_str.as_bytes())
-        .expect("Error decoding COOKIE_KEY_MASTER");
-    if cookie_key_master.len() != 32 {
+    let env_filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info"));
+    let formatting_layer = BunyanFormattingLayer::new("futeinf".into(), std::io::stdout);
+    let subscriber = Registry::default()
+        .with(env_filter)
+        .with(JsonStorageLayer)
+        .with(formatting_layer);
+
+    set_global_default(subscriber).expect("Error setting global default");
+
+    let cookie_key_master_str = SecretBox::from(
+        std::env::var("COOKIE_KEY_MASTER").expect("COOKIE_KEY_MASTER must be set")
+    );
+    let cookie_key_master = SecretBox::from(STANDARD
+        .decode(cookie_key_master_str.expose_secret().as_bytes())
+        .expect("Error decoding COOKIE_KEY_MASTER"));
+    if cookie_key_master.expose_secret().len() != 32 {
         panic!("COOKIE_KEY_MASTER must be 32 bytes long");
     }
-    let cookie_key = Key::derive_from(&cookie_key_master);
+    let cookie_key = 
+        Key::derive_from(&cookie_key_master.expose_secret());
 
     // Database
 
-    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let database_url = SecretBox::from(std::env::var("DATABASE_URL").expect("DATABASE_URL must be set"));
     let pool = PgPoolOptions::new()
         .max_connections(5)
-        .connect(&database_url)
+        .connect(&database_url.expose_secret())
         .await
         .expect("Error building a connection pool");
-    let local_db_url = std::env::var("LOCAL_DATABASE_URL").expect("LOCAL_DATABASE_URL must be set");
-    let db = Database::connect(local_db_url)
+    let local_db_url = SecretBox::from(std::env::var("LOCAL_DATABASE_URL").expect("LOCAL_DATABASE_URL must be set"));
+    let db = Database::connect(local_db_url.expose_secret())
+        .instrument(tracing::info_span!("local db connection"))
         .await
         .expect("Error connecting to the database");
+
+    
     Migrator::up(&db, None)
+        .instrument(tracing::info_span!("migrations"))
         .await
         .expect("Error running migrations");
+
     HttpServer::new(move || {
         let identity = IdentityMiddleware::builder()
             .visit_deadline(Some(Duration::from_secs(60 * 60 * 24 * 7)))

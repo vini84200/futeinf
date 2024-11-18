@@ -10,12 +10,13 @@ use actix_web::web::Data;
 use actix_web::{get, post, web, HttpResponse, Responder};
 use anyhow::anyhow;
 use entities::{prelude::*, *};
-use log::info;
+use tracing::{info, warn, Instrument, error};
 use rand::prelude::SliceRandom;
-use sea_orm::{ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{error, ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, QueryFilter, SelectColumns};
 use serde::Deserialize;
 use sqlx::{prelude::*, query};
 
+#[tracing::instrument(name = "Render Voting Form", skip(state))]
 #[get("/voting")]
 pub async fn voting(state: Data<AppState>) -> Result<impl Responder> {
     let context = tera::Context::new();
@@ -23,19 +24,25 @@ pub async fn voting(state: Data<AppState>) -> Result<impl Responder> {
     Ok(HttpResponse::Ok().body(page_content))
 }
 
+#[tracing::instrument(name = "Render Elegible Players", skip(state, identity))]
 #[get("/elegible")]
 pub async fn get_elegible_players(
     state: Data<AppState>,
     identity: Option<Identity>,
 ) -> Result<impl Responder> {
-    let identity = identity.ok_or(anyhow!("Not logged in"))?;
+    identity.ok_or(anyhow!("Not logged in"))?;
     let db = &state.db;
     let now = chrono::Utc::now();
 
     let start_elegible_check = get_start_elegible_check(now);
     let end_elegible_check = get_end_elegible_check(now);
 
-    let all_players: Vec<jogador::Model> = Jogador::find().all(db).await?;
+    let all_players: Vec<_> = Jogador::find()
+        .select_column(jogador::Column::Id)
+        .select_column(jogador::Column::Nome)
+        .select_column(jogador::Column::Apelido)
+        .all(db)
+        .await?;
 
     // Filter for players that have been active in the last 30 days
     let players: Vec<_> = query!(
@@ -46,6 +53,7 @@ pub async fn get_elegible_players(
         end_elegible_check
     )
     .fetch_all(&state.alfio_db)
+    
     .await?;
 
     let extra_players = ListaExtra::find()
@@ -64,7 +72,6 @@ pub async fn get_elegible_players(
         .map(|f| f.email.to_owned())
         .collect::<Option<Vec<_>>>()
         .unwrap_or_default();
-    info!("Players: {:?}", players);
     let elegible_players = all_players
         .iter()
         .filter(|x| players.contains(&x.email) || extra_players.contains(&x.id))
@@ -73,7 +80,7 @@ pub async fn get_elegible_players(
     info!(
         "Elegible players({}): {:?}",
         elegible_players.len(),
-        elegible_players
+        elegible_players.iter().map(|x| x.nome.to_owned()).collect::<Vec<String>>()
     );
 
     Ok(HttpResponse::Ok().json(
@@ -84,6 +91,7 @@ pub async fn get_elegible_players(
     ))
 }
 
+#[tracing::instrument(name = "Create Voting", skip(state, identity))]
 #[post("/voting/create")]
 pub async fn voting_create(
     state: Data<AppState>,
@@ -107,6 +115,7 @@ pub async fn voting_create(
 
     if let Some(b) = alredy_open_ballot {
         // Send the user to the voting page
+        info!("User {} already has an open ballot", identity.id().unwrap());
         return Ok(HttpResponse::Ok()
             .append_header(("HX-Redirect", format!("/voting/{}", b.id)))
             .body("Voting created"));
@@ -150,7 +159,6 @@ pub async fn voting_create(
         .map(|f| f.email.to_owned())
         .collect::<Option<Vec<_>>>()
         .unwrap_or_default();
-    info!("Players: {:?}", players);
     let elegible_players = all_players
         .iter()
         .filter(|x| players.contains(&x.email) || extra_players.contains(&x.id))
@@ -159,10 +167,11 @@ pub async fn voting_create(
     info!(
         "Elegible players({}): {:?}",
         elegible_players.len(),
-        elegible_players
+        elegible_players.iter().map(|x| x.nome.to_owned()).collect::<Vec<String>>()
     );
 
     if elegible_players.len() < 5 {
+        error!("Not enough players to create a ballot");
         return Ok(HttpResponse::BadRequest().body("Not enough players to create a ballot"));
     }
 
@@ -191,6 +200,7 @@ pub async fn voting_create(
         .body("Voting created"))
 }
 
+#[tracing::instrument(name = "Render Voting Form", skip(state, identity, path), fields(ballot_id = %path))]
 #[get("/voting/{ballot_id}")]
 pub async fn vote(
     state: Data<AppState>,
@@ -242,6 +252,7 @@ struct CastVote {
     players: Vec<String>,
 }
 
+#[tracing::instrument(name = "Submit Vote", skip(state, path, cast_vote, identity), fields(ballot_id = %path))]
 #[post("/voting/{ballot_id}/")]
 pub async fn vote_submit(
     state: Data<AppState>,
@@ -258,6 +269,7 @@ pub async fn vote_submit(
         .await?
         .ok_or(anyhow!("Ballot not found"))?;
     if ballot.voter != identity.id().unwrap() {
+        warn!("User {} tried to vote on ballot {}, but it belongs to {}", identity.id().unwrap(), ballot_id, ballot.voter);
         return Ok(HttpResponse::Unauthorized().body("You are not allowed to vote on this ballot"));
     }
     if ballot.state != "open" {
@@ -288,6 +300,7 @@ pub async fn vote_submit(
         ..Default::default()
     }
     .update(db)
+    .instrument(tracing::info_span!("Update ballot"))
     .await?;
     info!("Ballot updated");
     let mut context = tera::Context::new();
@@ -299,10 +312,11 @@ pub async fn vote_submit(
             .map(|x| x.to_string())
             .collect::<Vec<String>>(),
     );
-    println!("Votes: {:?}", cast_vote);
+    tracing::info!("Votes: {:?}", cast_vote); 
     Ok(HttpResponse::Ok().body("Voto computado"))
 }
 
+#[tracing::instrument(name = "Render Voting Success", skip(state, path, identity), fields(ballot_id = %path))]
 #[get("/voting/{ballot_id}/success")]
 pub async fn vote_success(
     state: Data<AppState>,

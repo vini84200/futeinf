@@ -1,5 +1,4 @@
 use lazy_static::lazy_static;
-use log::info;
 use sea_orm::JsonValue;
 use std::collections::HashMap;
 use tera::{Filter, Tera, Test, Value};
@@ -7,7 +6,6 @@ use tera::{Filter, Tera, Test, Value};
 struct IsNaN;
 impl Test for IsNaN {
     fn test(&self, value: Option<&Value>, args: &[Value]) -> tera::Result<bool> {
-        info!("Testing for NaN {:?}", value);
         if let Some(Value::Number(n)) = value {
             Ok(n.as_f64().map_or(false, |n| n.is_nan()))
         } else {

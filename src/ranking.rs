@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use actix_web::web::Data;
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
-use log::info;
+use tracing::info;
 use rand::Rng;
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter,
@@ -89,6 +89,7 @@ pub async fn get_or_create_apuracao(state: Data<AppState>, id: i32) -> Result<Ra
         let ranking = serde_json::from_value::<Ranking>(ranking)?;
         Ok(ranking)
     } else {
+        info!("Creating new apuracao for event {}", id);
         apurar_complete(state.clone(), id).await
     }
 }
@@ -124,6 +125,7 @@ pub async fn apurar_complete(state: Data<AppState>, id: i32) -> Result<Ranking> 
     Ok(ranking)
 }
 
+#[tracing::instrument(name = "Calculate Ranking", skip(state, id), fields(id = %id))]
 pub async fn calculate_ranking(state: Data<AppState>, id: i32) -> Result<Ranking> {
     let db = &state.clone().db;
     // Get the start of the week, ie. the last monday

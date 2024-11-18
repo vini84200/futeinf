@@ -1,5 +1,4 @@
 use crate::entities::ballot;
-use crate::entities::prelude::{Ballot, Jogador};
 use crate::error::Result;
 use crate::ranking::{get_or_create_apuracao, RankingEntry};
 use crate::templates::TEMPLATES;
@@ -9,12 +8,35 @@ use actix_web::web::Data;
 use actix_web::{get, web, HttpResponse, Responder};
 use chrono::prelude::*;
 use itertools::Itertools;
-use log::info;
+use tracing::{info, Instrument};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use std::collections::HashMap;
+use actix_identity::Identity;
+use anyhow::anyhow;
+use crate::entities::{prelude::*, *};
 
+#[tracing::instrument(name = "Render Debug Ranking", skip(identity, state))]
 #[get("/debugRanking")]
-pub async fn debug_ranking(state: Data<AppState>) -> Result<impl Responder> {
+pub async fn debug_ranking(
+    state: Data<AppState>, 
+    identity: Option<Identity>
+) -> Result<impl Responder> {
+    let identity = identity.ok_or(anyhow!("Not logged in"))?;
+
+    // Check if the user is an admin
+    let user = Jogador::find()
+        .filter(jogador::Column::Email.eq(&identity.id().unwrap()))
+        .one(&state.db)
+        .await?
+        .ok_or(anyhow!("User not found"))?;
+
+    if user.admin != true {
+        tracing::info!("User is not an admin");
+        Err(anyhow!("User is not an admin"))?;
+    }
+        
+
+
     let db = &state.db;
 
     let now = Utc::now();
@@ -212,6 +234,7 @@ pub async fn debug_ranking(state: Data<AppState>) -> Result<impl Responder> {
     Ok(HttpResponse::Ok().body(page_content))
 }
 
+#[tracing::instrument(name = "Render Week Ranking", skip(state))]
 #[get("/week_ranking/{week_id}")]
 pub async fn week_ranking(
     week_id: web::Path<i32>,
@@ -226,8 +249,9 @@ pub async fn week_ranking(
 
     // Checa se ja é possivel ver o ranking da semana
     if !timings::publish_results(ref_point) {
+
+        tracing::info!("Week {} not published yet", week_id);
         // Não é possivel ver o ranking da semana
-        // TODO: Fazer uma página de erro com uma função fácil
         let publication_time = timings::publish_time(ref_point);
         let publication_time = publication_time
             .with_timezone(&Local)
@@ -244,7 +268,10 @@ pub async fn week_ranking(
 
     // Checa se a semana já foi apurada
     // Se não foi, apura a semana
-    let ranking = get_or_create_apuracao(state, week_id).await?;
+
+    let ranking = get_or_create_apuracao(state, week_id)
+        .instrument(tracing::info_span!("Get or create apuracao")) 
+    .await?;
 
     let mut context = tera::Context::new();
     context.insert("semana", &semana);

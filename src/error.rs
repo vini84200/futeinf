@@ -25,6 +25,7 @@ impl ResponseError for Error {
     }
 
     fn error_response(&self) -> HttpResponse<actix_web::body::BoxBody> {
+        tracing::error!("{}", self);
         let mut context = tera::Context::new();
         context.insert("error", &self.to_string());
         let page_content = TEMPLATES.render("error.html", &context).unwrap();
