@@ -7,6 +7,7 @@ services:
     volumes:
       - ./production/db:/usr/src/app/db
     user: 1000:1000
+    restart: always
     environment:
       - COOKIE_KEY_MASTER=${DOCKER_COOKIE_KEY_MASTER}
       - DATABASE_URL=${DOCKER_DATABASE_URL}
