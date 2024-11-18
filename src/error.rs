@@ -30,6 +30,18 @@ impl ResponseError for Error {
         context.insert("error", &self.to_string());
         let page_content = TEMPLATES.render("error.html", &context).unwrap();
 
-        HttpResponse::build(self.status_code()).body(page_content)
+//         Response.Headers.Add("HX-Retarget", "#errors"); 
+// Response.Headers.Add("HX-Reswap", "innerHTML");
+        HttpResponse::build(self.status_code())
+            .append_header(("HX-Retarget", "#errors"))
+            .append_header(("HX-Reswap", "innerHTML"))
+        .body(page_content)
     }
+}
+
+pub fn create_bad_request<'a>(message: impl Into<String>) -> HttpResponse {
+    HttpResponse::BadRequest()
+        .append_header(("HX-Retarget", "#errors"))
+        .append_header(("HX-Reswap", "innerHTML"))
+        .body(message.into())
 }

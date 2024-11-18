@@ -10,6 +10,7 @@ use argon2::PasswordVerifier;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::Deserialize;
 use secrecy::{ExposeSecret, SecretBox, SecretString};
+use crate::error::create_bad_request;
 
 #[derive(Deserialize, Debug)]
 struct LoginData {
@@ -58,11 +59,15 @@ pub async fn login(
                 .body("Logged in"))
         } else {
             tracing::info!("Invalid password");
-            Ok(HttpResponse::BadRequest().body("Invalid username or password"))
+            Ok(
+                create_bad_request("Invalid username or password")
+            )
         }
     } else {
         tracing::info!("User not found");
-        Ok(HttpResponse::BadRequest().body("Invalid username or password"))
+        Ok(
+            create_bad_request("Invalid username or password")
+        )
     }
 }
 

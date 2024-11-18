@@ -1,4 +1,4 @@
-use crate::error::{Error, Result};
+use crate::error::{Error, Result, create_bad_request};
 use crate::templates::TEMPLATES;
 use crate::timings::{
     can_cast_vote, can_create_ballot, get_end_elegible_check, get_ref_point_of,
@@ -125,7 +125,7 @@ pub async fn voting_create(
 
     let can_create_ballot = can_create_ballot(now);
     if !can_create_ballot {
-        return Ok(HttpResponse::BadRequest().body("Cannot create a ballot at this time"));
+        return Ok(create_bad_request("Voting is closed"));
     }
     let start_elegible_check = get_start_elegible_check(now);
     let end_elegible_check = get_end_elegible_check(now);
@@ -172,7 +172,7 @@ pub async fn voting_create(
 
     if elegible_players.len() < 5 {
         error!("Not enough players to create a ballot");
-        return Ok(HttpResponse::BadRequest().body("Not enough players to create a ballot"));
+        return Ok(create_bad_request("Not enough players to create a ballot"));
     }
 
     // Get 5 random players
@@ -273,12 +273,12 @@ pub async fn vote_submit(
         return Ok(HttpResponse::Unauthorized().body("You are not allowed to vote on this ballot"));
     }
     if ballot.state != "open" {
-        return Ok(HttpResponse::BadRequest().body("Ballot is not open"));
+        return Ok(create_bad_request("Ballot is not open"));
     }
     let now = chrono::Utc::now();
     let ballot_rt = ref_point_from_id(ballot.fute_id as i32);
     if !can_cast_vote(ballot_rt) {
-        return Ok(HttpResponse::BadRequest().body("Voting is closed"));
+        return Ok(create_bad_request("Voting is closed"));
     }
 
     info!("Ballot: {:?}", ballot);
