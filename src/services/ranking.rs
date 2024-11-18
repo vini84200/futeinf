@@ -1,20 +1,17 @@
 use std::collections::HashMap;
 use crate::error::Result;
 use crate::ranking::{get_or_create_apuracao, RankingEntry};
-use crate::timings::{self, get_last_ref_point, get_ref_point_of, ref_point_from_id, ref_point_id};
+use crate::timings::{self, get_ref_point_of, ref_point_from_id, ref_point_id};
 use actix_web::{get, web, HttpResponse, Responder};
 use actix_web::web::Data;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use itertools::Itertools;
 use chrono::prelude::*;
-use log::{info, log};
-use serde::Serialize;
+use log::info;
 use crate::AppState;
-use crate::entities::{ballot, jogador};
-use crate::entities::ballot::Column::Vote;
+use crate::entities::ballot;
 use crate::entities::prelude::{Ballot, Jogador};
 use crate::templates::TEMPLATES;
-use anyhow::anyhow;
 
 
 
@@ -100,7 +97,7 @@ pub async fn debug_ranking(state: Data<AppState>) -> Result<impl Responder> {
         }
 
         for (player, vote) in ranked_votes {
-            let entry = votes_per_player.entry(player).or_insert(vec![]);
+            let entry = votes_per_player.entry(player).or_default();
             entry.push((vote.vote, vote.weight));
         }
 
@@ -146,7 +143,7 @@ pub async fn debug_ranking(state: Data<AppState>) -> Result<impl Responder> {
                         nome: x.nome.clone(),
                         media: *mean,
                         votos: votes as i32,
-                        desvio_padrao: std_dev.is_finite().then(|| *std_dev)
+                        desvio_padrao: std_dev.is_finite().then_some(*std_dev)
                     }
                 })
                 .collect::<Vec<_>>();
@@ -163,7 +160,7 @@ pub async fn debug_ranking(state: Data<AppState>) -> Result<impl Responder> {
 
 
     let mut context = tera::Context::new();
-    context.insert("votes", &votes.iter().count());
+    context.insert("votes", &votes.len());
     context.insert("last_reset", &start_of_week.with_timezone(&Local).format("%d/%m/%Y %H:%M:%S").to_string());
     context.insert("now", &Utc::now().with_timezone(&Local).format("%d/%m/%Y %H:%M:%S").to_string());
     context.insert("ranking", &players_mentioned);

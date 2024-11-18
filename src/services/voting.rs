@@ -1,7 +1,7 @@
 use crate::templates::TEMPLATES;
 use crate::timings::{can_cast_vote, can_create_ballot, get_end_elegible_check, get_ref_point_of, get_start_elegible_check, ref_point_from_id, ref_point_id};
 use crate::{entities, list, AppState};
-use sqlx::{prelude::*, query, query_as};
+use sqlx::{prelude::*, query};
 use actix_identity::Identity;
 use actix_web::web::Data;
 use actix_web::{get, post, web, HttpResponse, Responder};
@@ -9,7 +9,7 @@ use anyhow::anyhow;
 use log::info;
 use rand::prelude::SliceRandom;
 use sea_orm::{ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, QueryFilter};
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 use entities::{prelude::*, *};
 use crate::error::{Error, Result};
 
@@ -81,7 +81,7 @@ pub async fn voting_create(
 
     // Check if a open ballot exists for the current week
     let alredy_open_ballot = Ballot::find()
-        .filter(ballot::Column::FuteId.eq(event_id as i32))
+        .filter(ballot::Column::FuteId.eq(event_id))
         .filter(ballot::Column::State.eq("open"))
         .filter(ballot::Column::Voter.eq(identity.id().unwrap()))
         .one(db)
@@ -150,7 +150,7 @@ pub async fn voting_create(
         vote: ActiveValue::Set(serde_json::json!([])),
         date: ActiveValue::Set(chrono::Utc::now()),
         voter: ActiveValue::Set(identity.id().unwrap().to_string()),
-        fute_id: ActiveValue::Set(event_id as i32),
+        fute_id: ActiveValue::Set(event_id),
         state: ActiveValue::Set("open".to_string()), // TODO: Change to enum.
         ..Default::default()
     };
@@ -190,14 +190,14 @@ pub async fn vote(state: Data<AppState>, path: web::Path<u32>,
             });
         }
         context.insert("players", &players);
-        let semana = ref_point_from_id(ballot.fute_id as i32);
+        let semana = ref_point_from_id(ballot.fute_id);
         context.insert("semana", &semana.format("%d/%m/%Y").to_string());
         context.insert("week_id", &ballot.fute_id);
 
         let page_content = TEMPLATES.render("voting.html", &context)?;
         Ok(HttpResponse::Ok().body(page_content))
     } else {
-        return Ok(HttpResponse::NotFound().body("Ballot not found"));
+        Ok(HttpResponse::NotFound().body("Ballot not found"))
     }
 
 
@@ -287,6 +287,6 @@ pub async fn vote_success(state: Data<AppState>, path: web::Path<u32>,
         let page_content = TEMPLATES.render("voting_success.html", &context)?;
         Ok(HttpResponse::Ok().body(page_content))
     } else {
-        return Ok(HttpResponse::NotFound().body("Ballot not found"));
+        Ok(HttpResponse::NotFound().body("Ballot not found"))
     }
 }

@@ -18,10 +18,10 @@ pub fn get_ref_point_of(date: DateTime<Utc>) -> DateTime<Utc> {
     let rem = d.num_seconds() % WEEK_IN_SECONDS;
 
     //subtract the remainder from current time
-    let target = date - Duration::seconds(rem);
+    
 
     //last reset / datetime
-    target
+    date - Duration::seconds(rem)
 }
 
 pub fn get_last_ref_point() -> DateTime<Utc> {
@@ -36,13 +36,13 @@ pub fn get_start_elegible_check(date: DateTime<Utc>) -> DateTime<Utc> {
 }
 
 pub fn get_end_elegible_check(date: DateTime<Utc>) -> DateTime<Utc> {
-    let last_reset = get_ref_point_of(date);
-    last_reset
+    
+    get_ref_point_of(date)
 }
 
 pub fn get_start_voting(date: DateTime<Utc>) -> DateTime<Utc> {
-    let last_reset = get_ref_point_of(date);
-    last_reset
+    
+    get_ref_point_of(date)
 }
 
 pub fn get_end_create_ballot(date: DateTime<Utc>) -> DateTime<Utc> {

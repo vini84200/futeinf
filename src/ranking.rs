@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use actix_web::web::Data;
-use anyhow::ensure;
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use log::info;
@@ -20,7 +19,6 @@ use crate::{
         ballot,
         prelude::Jogador
     },
-    services::ranking,
     AppState,
 };
 
@@ -203,7 +201,7 @@ pub async fn calculate_ranking(state: Data<AppState>, id: i32) -> Result<Ranking
         }
 
         for (player, vote) in ranked_votes {
-            let entry = votes_per_player.entry(player).or_insert(vec![]);
+            let entry = votes_per_player.entry(player).or_default();
             entry.push((vote.vote, vote.weight));
         }
 
@@ -249,7 +247,7 @@ pub async fn calculate_ranking(state: Data<AppState>, id: i32) -> Result<Ranking
                         nome: x.nome.clone(),
                         media: *mean,
                         votos: votes as i32,
-                        desvio_padrao: std_dev.is_finite().then(|| *std_dev)
+                        desvio_padrao: std_dev.is_finite().then_some(*std_dev)
                     }
                 })
                 .collect::<Vec<_>>();

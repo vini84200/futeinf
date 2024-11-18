@@ -1,7 +1,7 @@
 use std::{time::Duration};
 
 use actix_web::{
-    cookie::{Key}, middleware::Logger, web::Data, App, HttpResponse, HttpServer, ResponseError
+    cookie::{Key}, web::Data, App, HttpServer
 };
 use base64::{engine::general_purpose::STANDARD, Engine};
 use dotenv::dotenv;
