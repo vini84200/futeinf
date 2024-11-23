@@ -162,6 +162,8 @@ pub async fn voting_create(
     let elegible_players = all_players
         .iter()
         .filter(|x| players.contains(&x.email) || extra_players.contains(&x.id))
+        // Remove o jogador que está criando a votação
+        .filter(|x| x.email != identity.id().unwrap())
         .collect::<Vec<_>>();
 
     info!(
