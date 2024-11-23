@@ -44,7 +44,84 @@
             {% endfor %}
         </tbody>
     </table>
-    <a href="/" class="btn btn-primary">Voltar</a>
+    <p class="d-inline-flex gap-1">
+        <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#graph-collapse" aria-expanded="false" aria-controls="graph-collapse">
+            <i class="bi bi-bar-chart"></i>
+            Mostrar Gráfico
+        </button>
+        <a href="/" class="btn btn-primary">Voltar</a>
+    </p>
+
+    <div class="collapse" id="graph-collapse">
+        <div id="graph"></div>
+
+    </div>
+
+<script>
+    var trace1 = {
+
+  text: [
+    {% for player in ranking %}
+    '{{ player.nome }}',
+    {% endfor %}
+  ],
+
+  x: [
+    {% for player in ranking %}
+    {{ player.desvio_padrao }} * 100 ?? 0,
+    {% endfor %}
+  ],
+  y: [
+    {% for player in ranking %}
+    {{ player.media }} * 100,
+    {% endfor %}
+  ],
+
+  mode: 'markers+text',
+
+  type: 'scatter',
+  textposition: 'top center',
+
+  textfont: {
+
+    family:  'Raleway, sans-serif'
+
+  },
+
+  marker: { size: 12 }
+
+
+};
+
+var data = [trace1];
+
+var width = window.screen.width * window.devicePixelRatio;
+
+var layout = {
+  title: 'Ranking',
+  xaxis: {
+    title: 'Desvio Padrão (%)',
+    showgrid: false,
+    zeroline: false
+  },
+  yaxis: {
+    title: 'Percentil (%)',
+    showline: false
+  },
+  autosize: false,
+  width: width * 0.75,
+  height: width,
+};
+
+
+var config = {responsive: true}
+
+
+
+
+Plotly.newPlot('graph', data, layout, config);
+
+</script>
 </div>
 
 {% endblock %}

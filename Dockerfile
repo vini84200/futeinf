@@ -39,4 +39,4 @@ VOLUME [ "${APP}/db" ]
 USER $APP_USER
 WORKDIR $APP
 
-CMD ls -la && ./app
+CMD ./app
