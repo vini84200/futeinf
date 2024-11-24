@@ -48,4 +48,6 @@ pub(crate) enum Jogador {
     SenhaHash,
     // Added by m20241117_150055_lista_extra.rs
     Admin,
+    // Added by m20241123_213837_imagens.rs
+    Imagem,
 }

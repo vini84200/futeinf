@@ -12,6 +12,8 @@ pub struct Model {
     pub email: String,
     pub senha_hash: String,
     pub admin: bool,
+    #[sea_orm(column_type = "Blob", nullable)]
+    pub imagem: Option<Vec<u8>>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

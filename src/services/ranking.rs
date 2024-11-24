@@ -196,6 +196,7 @@ pub async fn debug_ranking(
                 media: *mean,
                 votos: votes as i32,
                 desvio_padrao: std_dev.is_finite().then_some(*std_dev),
+                id: x.id,
             }
         })
         .collect::<Vec<_>>();
@@ -211,6 +212,7 @@ pub async fn debug_ranking(
         .iter()
         .sorted_by(|a, b| a.pos.cmp(&b.pos))
         .collect_vec();
+
 
     let mut context = tera::Context::new();
     context.insert("votes", &votes.len());
@@ -230,6 +232,9 @@ pub async fn debug_ranking(
     );
     context.insert("ranking", &players_mentioned);
     context.insert("ref_point_id", &ref_point_id(now));
+    let imagens = Jogador::find().all(db).await?;
+    let imagens = imagens.iter().map(|x| (x.id, x.imagem.clone())).collect::<HashMap<_, _>>();
+    context.insert("images", &imagens);
     let page_content = TEMPLATES.render("debug_ranking.html", &context)?;
     Ok(HttpResponse::Ok().body(page_content))
 }
@@ -269,7 +274,7 @@ pub async fn week_ranking(
     // Checa se a semana já foi apurada
     // Se não foi, apura a semana
 
-    let ranking = get_or_create_apuracao(state, week_id)
+    let ranking = get_or_create_apuracao(state.clone(), week_id)
         .instrument(tracing::info_span!("Get or create apuracao")) 
     .await?;
 
@@ -286,6 +291,9 @@ pub async fn week_ranking(
     context.insert("ranking", &ranking.entries);
     context.insert("votes", &ranking.votes);
     context.insert("week_id", &week_id);
+    let imagens = Jogador::find().all(&state.db).await?;
+    let imagens = imagens.iter().map(|x| (x.id, x.imagem.clone())).collect::<HashMap<_, _>>();
+    context.insert("images", &imagens);
 
     let page_content = TEMPLATES.render("week_ranking.html", &context)?;
     Ok(HttpResponse::Ok().body(page_content))

@@ -59,7 +59,24 @@
         {% for player in players %}
         <div class="player-sort card m-1" data-id="{{ player.id }}">
           <div class="card-body">
-            {{ player.nome }}
+            <div class="d-flex">
+
+              <img class="avatar avatar-96 bg-light rounded-circle text-white p-2"
+              {% if player.imagem %}
+                src="{{ player.imagem | as_blob }}"
+              {% else %}
+                src="https://raw.githubusercontent.com/twbs/icons/main/icons/person-fill.svg"
+              {% endif %}
+              >
+              <div>
+            <h5>
+              {{ player.apelido }}
+            </h5>
+            <small>
+              {{ player.nome }}
+            </small>
+            </div>
+            </div>
           </div>
         </div>
         {% endfor %}

@@ -235,6 +235,7 @@ pub async fn vote(
                 id: player.id,
                 nome: player.nome,
                 apelido: player.apelido,
+                imagem: player.imagem,
             });
         }
         context.insert("players", &players);
@@ -338,19 +339,6 @@ pub async fn vote_success(
         let mut context = tera::Context::new();
         context.insert("ballot_id", &ballot_id);
         let votes: Vec<i32> = serde_json::from_value(ballot.vote)?;
-        let mut players: Vec<list::Jogador> = vec![];
-        for player_id in votes {
-            let player = Jogador::find_by_id(player_id)
-                .one(db)
-                .await?
-                .ok_or(anyhow!("Player not found"))?;
-            players.push(list::Jogador {
-                id: player.id,
-                nome: player.nome,
-                apelido: player.apelido,
-            });
-        }
-        context.insert("players", &players);
         let page_content = TEMPLATES.render("voting_success.html", &context)?;
         Ok(HttpResponse::Ok().body(page_content))
     } else {

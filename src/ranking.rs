@@ -26,6 +26,7 @@ use crate::{
 pub struct RankingEntry {
     pub pos: i32,
     pub nome: String,
+    pub id: i32,
     pub media: f32,
     pub votos: i32,
     pub desvio_padrao: Option<f32>,
@@ -283,6 +284,7 @@ pub async fn calculate_ranking(state: Data<AppState>, id: i32) -> Result<Ranking
                 media: *mean,
                 votos: votes as i32,
                 desvio_padrao: std_dev.is_finite().then_some(*std_dev),
+                id: x.id,
             }
         })
         .collect::<Vec<_>>();

@@ -1,3 +1,4 @@
+use base64::{prelude::BASE64_STANDARD, Engine};
 use lazy_static::lazy_static;
 use sea_orm::JsonValue;
 use std::collections::HashMap;
@@ -27,12 +28,37 @@ impl Filter for AsPercent {
     }
 }
 
+struct AsBlob;
+
+impl Filter for AsBlob {
+    fn filter(&self, value: &Value, _args: &HashMap<String, JsonValue>) -> tera::Result<Value> {
+        if let Value::Array(arr) = value {
+            let mut bytes = vec![];
+            for v in arr {
+                if let Value::Number(n) = v {
+                    bytes.push(n.as_u64().unwrap() as u8);
+                }
+                else {
+                    return Err("Invalid value".into());
+                }
+            }
+            // Convert to base64
+            let encoded = BASE64_STANDARD.encode(&bytes);
+            let encoded = format!("data:image;base64,{}", encoded);
+            Ok(encoded.into())
+        } else {
+            Ok(Value::Null)
+        }
+    }
+}
+
 lazy_static! {
     pub static ref TEMPLATES: Tera = {
         let source = "templates/**/*.html";
         let mut tera = Tera::new(source).expect("failed to compile template");
         tera.autoescape_on(vec![".html", ".sql"]);
         tera.register_filter("as_percent", AsPercent);
+        tera.register_filter("as_blob", AsBlob);
         tera
     };
 }

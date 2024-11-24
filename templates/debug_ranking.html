@@ -36,7 +36,18 @@
             {% for player in ranking %}
             <tr>
                 <th scope="row">{{ player.pos }}</th>
-                <td>{{ player.nome }}</td>
+                <td>
+                
+              <img class="avatar avatar-48 bg-light rounded-circle text-white p-2"
+              {% if images[player.id] %}
+                src="{{ images[player.id] | as_blob }}"
+              {% else %}
+                src="https://raw.githubusercontent.com/twbs/icons/main/icons/person-fill.svg"
+              {% endif %}
+              >
+                {{ player.nome }}
+                
+                </td>
                 <td>{{ player.media | as_percent }}</td>
                 <td>σ = {{ player.desvio_padrao | as_percent }}</td>
                 <td>{{ player.votos }}</td>

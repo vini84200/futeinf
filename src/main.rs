@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use actix_web::{cookie::Key, web::Data, App, HttpServer};
 use base64::{engine::general_purpose::STANDARD, Engine};
+use chrono::serde::ts_microseconds_option::serialize;
 use dotenv::dotenv;
 use env_logger::Env;
 use migration::{Migrator, MigratorTrait};
@@ -83,6 +84,11 @@ async fn main() -> std::io::Result<()> {
             .login_deadline(Some(Duration::from_secs(60 * 60 * 24 * 31)))
             .build();
 
+        let cookie_middle = SessionMiddleware::builder(
+            CookieSessionStore::default(),
+            cookie_key.clone(),
+        );
+
         App::new()
             // Install the identity framework first.
             .wrap(identity)
@@ -90,10 +96,7 @@ async fn main() -> std::io::Result<()> {
             // middleware to leverage `actix-identity`. The session middleware must be mounted
             // AFTER the identity middleware: `actix-web` invokes middleware in the OPPOSITE
             // order of registration when it receives an incoming request.
-            .wrap(SessionMiddleware::new(
-                CookieSessionStore::default(),
-                cookie_key.clone(),
-            ))
+            .wrap( cookie_middle.build())
             .app_data(Data::new(AppState {
                 alfio_db: pool.clone(),
                 db: db.clone(),
@@ -111,6 +114,7 @@ async fn main() -> std::io::Result<()> {
             .service(services::auth::login_form)
             .service(services::auth::login)
             .service(services::auth::logout)
+            .service(services::auth::upload_image)
     })
     .bind(("0.0.0.0", 8080))?
     .run()

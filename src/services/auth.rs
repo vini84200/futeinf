@@ -7,10 +7,13 @@ use actix_web::web::Data;
 use actix_web::{get, post, web, HttpMessage, HttpResponse, Responder};
 use argon2;
 use argon2::PasswordVerifier;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{ActiveValue, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, ActiveModelTrait};
 use serde::Deserialize;
 use secrecy::{ExposeSecret, SecretBox, SecretString};
+
+use futures_util::StreamExt as _;
 use crate::error::create_bad_request;
+
 
 #[derive(Deserialize, Debug)]
 struct LoginData {
@@ -83,4 +86,43 @@ pub async fn logout(identity: Option<Identity>) -> impl Responder {
     HttpResponse::Ok()
         .append_header(("HX-Refresh", "true"))
         .body("Logged out")
+}
+
+#[tracing::instrument(
+    name = "Upload Image",
+    skip(app_state, payload, identity),
+)]
+#[post("/upload_image")]
+pub async fn upload_image(
+    app_state: Data<AppState>,
+    mut payload: actix_multipart::Multipart,
+    identity: Option<Identity>
+) -> Result<HttpResponse> {
+    let db = &app_state.db;
+    let mut imagem = None;
+    while let Some(item) = payload.next().await {
+        let mut field = item.map_err(|e| anyhow::anyhow!("Erro lendo arquivo"))?;
+        let content_type = field.content_disposition().unwrap();
+        let filename = content_type.get_filename().unwrap();
+        let mut data = Vec::new();
+        while let Some(chunk) = field.next().await {
+            let chunk  = chunk.map_err(|e| anyhow::anyhow!("Erro lendo arquivo"))?;
+            data.extend_from_slice(&chunk);
+        }
+        imagem = Some(data);
+    }
+    if let Some(imagem) = imagem {
+        let user = Jogador::find()
+            .filter(jogador::Column::Email.eq(identity.unwrap().id().unwrap()))
+            .one(db)
+            .await?;
+        let user = user.ok_or(anyhow::anyhow!("User not found"))?;
+        let mut user = user.into_active_model();
+        user.imagem = ActiveValue::set(Some(imagem));
+        user.save(db).await?;
+
+        Ok(HttpResponse::Ok().body("Image uploaded"))
+    } else {
+        Ok(create_bad_request("No image uploaded"))
+    }
 }

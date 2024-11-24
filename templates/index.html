@@ -6,6 +6,13 @@
 </div>
 
 {% if logged_in %}
+              <img class="avatar avatar-64 bg-light rounded-circle text-white p-2"
+              {% if imagem %}
+                src="{{ imagem | as_blob }}"
+              {% else %}
+                src="https://raw.githubusercontent.com/twbs/icons/main/icons/person-fill.svg"
+              {% endif %}
+              >
 <span>
   Olá {{ username }}!
   <button
@@ -14,6 +21,14 @@
     >
     <i class="bi bi-door-open"></i>
     Sair
+  </button>
+
+  <button
+    class="btn btn-primary"
+    data-bs-toggle="modal"
+    data-bs-target="#imageUploadModal"
+    >
+    Envie sua foto
   </button>
 </span>
 {% else %}
@@ -31,6 +46,8 @@
   </div>
 </div>
 {% endif %}
+
+
 
 
 {# <div 
@@ -75,5 +92,36 @@
 </a>
 </div>
   {% endif %}
+
+{# Modal para enviar cropar a imagem e enviar #}
+
+<div class="modal fade" id="imageUploadModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          Enviar Imagem
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id='form' hx-encoding='multipart/form-data' hx-post='/upload_image'>
+        <input type='file' name='file' accept="image/*">
+        <button>
+            Upload
+        </button>
+        <progress id='progress' value='0' max='100'></progress>
+    </form>
+    <script>
+        htmx.on('#form', 'htmx:xhr:progress', function(evt) {
+          htmx.find('#progress').setAttribute('value', evt.detail.loaded/evt.detail.total * 100)
+        });
+    </script>
+
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 

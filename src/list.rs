@@ -7,6 +7,7 @@ pub struct Jogador {
     pub nome: String,
     pub id: i32,
     pub apelido: String,
+    pub imagem: Option<Vec<u8>>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -54,6 +55,7 @@ pub async fn get_list(db: Pool<Postgres>) -> Result<Vec<Jogador>> {
                 nome: camisa.clone(),
                 apelido: camisa,
                 id: fv.ticket_id_fk.unwrap(),
+                imagem: None,
             }
         })
         .collect())
