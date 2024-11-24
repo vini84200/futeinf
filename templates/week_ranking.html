@@ -23,11 +23,8 @@
             <td>
             
               <img class="avatar avatar-48 bg-light rounded-circle text-white p-2"
-              {% if images[player.id] %}
-                src="{{ images[player.id] | as_blob }}"
-              {% else %}
-                src="https://raw.githubusercontent.com/twbs/icons/main/icons/person-fill.svg"
-              {% endif %}
+                src="/image/{{ player.id }}"
+                onerror="this.onerror=null;this.src='https://raw.githubusercontent.com/twbs/icons/main/icons/person-fill.svg'"
               >
             {{ player.nome }}</td>
             <td>{{ player.media | as_percent }}</td>

@@ -115,6 +115,7 @@ async fn main() -> std::io::Result<()> {
             .service(services::auth::login)
             .service(services::auth::logout)
             .service(services::auth::upload_image)
+            .service(services::auth::get_image)
     })
     .bind(("0.0.0.0", 8080))?
     .run()

@@ -3,27 +3,27 @@ use crate::error::Result;
 use crate::templates::TEMPLATES;
 use crate::AppState;
 use actix_identity::Identity;
-use actix_web::web::Data;
+use actix_web::http::header::CacheControl;
+use actix_web::web::{Data, Path};
 use actix_web::{get, post, web, HttpMessage, HttpResponse, Responder};
 use argon2;
 use argon2::PasswordVerifier;
-use sea_orm::{ActiveValue, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, ActiveModelTrait};
-use serde::Deserialize;
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter,
+};
 use secrecy::{ExposeSecret, SecretBox, SecretString};
+use serde::Deserialize;
 
-use futures_util::StreamExt as _;
 use crate::error::create_bad_request;
-
+use futures_util::StreamExt as _;
 
 #[derive(Deserialize, Debug)]
 struct LoginData {
     email: String,
-    password: SecretString
+    password: SecretString,
 }
 
-#[tracing::instrument(
-    name = "Render Login Form",
-)]
+#[tracing::instrument(name = "Render Login Form")]
 #[get("/login")]
 pub async fn login_form() -> impl Responder {
     let context = tera::Context::new();
@@ -62,22 +62,15 @@ pub async fn login(
                 .body("Logged in"))
         } else {
             tracing::info!("Invalid password");
-            Ok(
-                create_bad_request("Invalid username or password")
-            )
+            Ok(create_bad_request("Invalid username or password"))
         }
     } else {
         tracing::info!("User not found");
-        Ok(
-            create_bad_request("Invalid username or password")
-        )
+        Ok(create_bad_request("Invalid username or password"))
     }
 }
 
-#[tracing::instrument(
-    name = "Logout User",
-    skip(identity),
-)]
+#[tracing::instrument(name = "Logout User", skip(identity))]
 #[post("/logout")]
 pub async fn logout(identity: Option<Identity>) -> impl Responder {
     if let Some(identity) = identity {
@@ -88,15 +81,12 @@ pub async fn logout(identity: Option<Identity>) -> impl Responder {
         .body("Logged out")
 }
 
-#[tracing::instrument(
-    name = "Upload Image",
-    skip(app_state, payload, identity),
-)]
+#[tracing::instrument(name = "Upload Image", skip(app_state, payload, identity))]
 #[post("/upload_image")]
 pub async fn upload_image(
     app_state: Data<AppState>,
     mut payload: actix_multipart::Multipart,
-    identity: Option<Identity>
+    identity: Option<Identity>,
 ) -> Result<HttpResponse> {
     let db = &app_state.db;
     let mut imagem = None;
@@ -106,7 +96,7 @@ pub async fn upload_image(
         let filename = content_type.get_filename().unwrap();
         let mut data = Vec::new();
         while let Some(chunk) = field.next().await {
-            let chunk  = chunk.map_err(|e| anyhow::anyhow!("Erro lendo arquivo"))?;
+            let chunk = chunk.map_err(|e| anyhow::anyhow!("Erro lendo arquivo"))?;
             data.extend_from_slice(&chunk);
         }
         imagem = Some(data);
@@ -124,5 +114,30 @@ pub async fn upload_image(
         Ok(HttpResponse::Ok().body("Image uploaded"))
     } else {
         Ok(create_bad_request("No image uploaded"))
+    }
+}
+
+#[tracing::instrument(
+    name = "Get Image",
+    skip(app_state),
+    fields(id = %id)
+)]
+#[get("/image/{id}")]
+pub async fn get_image(app_state: Data<AppState>, id: Path<i32>) -> Result<HttpResponse> {
+    let db = &app_state.db;
+    let user = Jogador::find()
+        .filter(jogador::Column::Id.eq(id.into_inner()))
+        .one(db)
+        .await?;
+    if let Some(user) = user {
+        let imagem = user.imagem.unwrap();
+        Ok(HttpResponse::Ok()
+            .insert_header(CacheControl(vec![
+                actix_web::http::header::CacheDirective::Public,
+                actix_web::http::header::CacheDirective::MaxAge(360),
+            ]))
+            .body(imagem))
+    } else {
+        Ok(create_bad_request("User not found"))
     }
 }

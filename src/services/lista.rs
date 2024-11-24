@@ -23,7 +23,7 @@ pub async fn index(identity: Option<Identity>,
             .await?;
         let user = user.ok_or(anyhow!("User not found"))?;
         context.insert("username", &user.nome);
-        context.insert("imagem", &user.imagem);
+        context.insert("user_id", &user.id);
 
 
     } else {

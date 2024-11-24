@@ -7,11 +7,8 @@
 
 {% if logged_in %}
               <img class="avatar avatar-64 bg-light rounded-circle text-white p-2"
-              {% if imagem %}
-                src="{{ imagem | as_blob }}"
-              {% else %}
-                src="https://raw.githubusercontent.com/twbs/icons/main/icons/person-fill.svg"
-              {% endif %}
+                onerror="this.onerror=null;this.src='https://raw.githubusercontent.com/twbs/icons/main/icons/person-fill.svg'"
+                src="/image/{{ user_id }}"
               >
 <span>
   Olá {{ username }}!
