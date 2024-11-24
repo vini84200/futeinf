@@ -62,11 +62,8 @@
             <div class="d-flex">
 
               <img class="avatar avatar-96 bg-light rounded-circle text-white p-2"
-              {% if player.imagem %}
-                src="{{ player.imagem | as_blob }}"
-              {% else %}
-                src="https://raw.githubusercontent.com/twbs/icons/main/icons/person-fill.svg"
-              {% endif %}
+                src="/image/{{ player.id }}"
+                onerror="this.onerror=null;this.src='https://raw.githubusercontent.com/twbs/icons/main/icons/person-fill.svg'"
               >
               <div>
             <h5>
