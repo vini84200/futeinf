@@ -45,7 +45,8 @@ pub fn get_start_voting(date: DateTime<Utc>) -> DateTime<Utc> {
 
 pub fn get_end_create_ballot(date: DateTime<Utc>) -> DateTime<Utc> {
     let last_reset = get_ref_point_of(date);
-    last_reset + Duration::weeks(1) - Duration::minutes(30)
+    // In the last 3 minutes of the voting we can only cast votes already created
+    last_reset + Duration::weeks(1) - Duration::minutes(3)
 }
 
 pub fn get_end_voting(date: DateTime<Utc>) -> DateTime<Utc> {
