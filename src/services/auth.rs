@@ -130,13 +130,19 @@ pub async fn get_image(app_state: Data<AppState>, id: Path<i32>) -> Result<HttpR
         .one(db)
         .await?;
     if let Some(user) = user {
-        let imagem = user.imagem.unwrap();
-        Ok(HttpResponse::Ok()
-            .insert_header(CacheControl(vec![
-                actix_web::http::header::CacheDirective::Public,
-                actix_web::http::header::CacheDirective::MaxAge(360),
-            ]))
-            .body(imagem))
+        let imagem = user.imagem;
+        if let Some(imagem) = imagem {
+            return Ok(HttpResponse::Ok()
+                .insert_header(CacheControl(vec![
+                    actix_web::http::header::CacheDirective::Public,
+                    actix_web::http::header::CacheDirective::MaxAge(360),
+                ]))
+                .body(imagem));
+        }
+        else {
+            Ok(HttpResponse::NotFound().body("Image not found"))
+        }
+    
     } else {
         Ok(create_bad_request("User not found"))
     }
